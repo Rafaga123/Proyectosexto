@@ -13,13 +13,15 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 
 public class MainGame extends ApplicationAdapter {
 
-    SpriteBatch        batch;
+    SpriteBatch batch;
     OrthographicCamera camera;
-    Viewport           viewport;
-    Vector3            touchPoint; // Objeto para reutilizar en cada toque
+    Viewport viewport;
+    Vector3 touchPoint; // Objeto para reutilizar en cada toque
 
     // Tablero
-    Texture       texturaTablero;
+    Texture texturaTablero;
+    Texture SombraA;
+    Texture SombraB;
 
     // variables de Scroll y Progresión
     float scrollY = 0f;
@@ -28,36 +30,38 @@ public class MainGame extends ApplicationAdapter {
     int filaLogicaJugador = 0; // Fila real en el tablero
 
     // Pieza
-    Texture       atlasTextura;
+    Texture atlasTextura;
     TextureRegion piezaRey;
 
     // Mundo virtual
     static final float WORLD_WIDTH  = 480f;
     static final float WORLD_HEIGHT = 800f;
 
-
     // Jugador
     int jugadorCol = 2;
-    static final int   COLS              = 5;
-    static final float CELL_W            = WORLD_WIDTH / COLS;
-    static final float CELL_H            = CELL_W;
-    static final int   JUGADOR_FILA_VIS  = 1;
+    static final int COLS = 5;
+    static final float CELL_W = WORLD_WIDTH / COLS;
+    static final float CELL_H = CELL_W;
+    static final int JUGADOR_FILA_VIS = 1;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
-        touchPoint = new Vector3(); // Inicializamos el vector
+        touchPoint = new Vector3();
 
-        // Configuración de textura del tablero con Repeat para scroll infinito
-        texturaTablero = new Texture(Gdx.files.internal("tablero.png"), true);
-        texturaTablero.setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
+        // Cargar tablero puro (ya no necesita Wrap Repeat porque lo dibujamos en bucle)
+        texturaTablero = new Texture(Gdx.files.internal("tablero.png"));
         texturaTablero.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        // Cargar sombras
+        SombraA = new Texture(Gdx.files.internal("sombra_a.png"));
+        SombraB = new Texture(Gdx.files.internal("sombra_b.png"));
 
         // Pieza del jugador (Rey)
         atlasTextura = new Texture("test.png");
-        piezaRey     = new TextureRegion(atlasTextura, 64, 73);
+        piezaRey = new TextureRegion(atlasTextura, 64, 73);
 
-        camera   = new OrthographicCamera();
+        camera = new OrthographicCamera();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
         camera.position.set(WORLD_WIDTH / 2f, WORLD_HEIGHT / 2f, 0);
     }
@@ -69,7 +73,6 @@ public class MainGame extends ApplicationAdapter {
 
         // 2. Lógica de Scroll (Movimiento suave)
         float delta = Gdx.graphics.getDeltaTime();
-        // Lerp: acerca suavemente scrollY hacia targetScrollY
         scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
 
         // 3. Dibujado
@@ -79,22 +82,38 @@ public class MainGame extends ApplicationAdapter {
 
         batch.begin();
 
-        // Calcular la escala para que la textura ocupe exactamente los 480 de ancho
+        // --- A. DIBUJAR TABLERO INFINITO ---
         float scale = WORLD_WIDTH / texturaTablero.getWidth();
         float scaledHeight = texturaTablero.getHeight() * scale;
-
-        // Determinar el desfase actual basado en el scroll
         float offsetY = scrollY % scaledHeight;
 
-        // Dibujar el tablero en bucle para cubrir toda la altura de la pantalla
-        // Esto crea el efecto de scroll infinito sin problemas de TextureWrap
         float drawY = -offsetY;
         while (drawY < WORLD_HEIGHT) {
             batch.draw(texturaTablero, 0, drawY, WORLD_WIDTH, scaledHeight);
             drawY += scaledHeight;
         }
 
-        // Dibujar Jugador (se mantiene en su posición visual fija)
+        // --- B. DIBUJAR SOMBRA EN LA BASE ---
+        // Calcular qué fila lógica está actualmente cruzando la coordenada Y=0
+        int filaEnBase = (int) (scrollY / CELL_H);
+
+        Texture sombraActual;
+        // Si es una fila par, la base es la fila de "Abajo" -> Sombra B
+        // Si es una fila impar (1, 3, 5...), la base es la fila de "Arriba" -> Sombra A
+        if (filaEnBase % 2 == 0) {
+            sombraActual = SombraB;
+        } else {
+            sombraActual = SombraA;
+        }
+
+        // Escalar la sombra para que cubra todo el ancho de la pantalla
+        float scaleSombra = WORLD_WIDTH / sombraActual.getWidth();
+        float altoSombraEscalada = sombraActual.getHeight() * scaleSombra;
+
+        // Dibujarla estática en la parte inferior (Y=0)
+        batch.draw(sombraActual, 0, 0, WORLD_WIDTH, altoSombraEscalada);
+
+        // --- C. DIBUJAR JUGADOR ---
         float px = jugadorCol * CELL_W;
         float py = JUGADOR_FILA_VIS * CELL_H;
         batch.draw(piezaRey, px, py, CELL_W, CELL_H);
@@ -134,6 +153,8 @@ public class MainGame extends ApplicationAdapter {
     public void dispose() {
         batch.dispose();
         texturaTablero.dispose();
+        SombraA.dispose();
+        SombraB.dispose();
         atlasTextura.dispose();
     }
 }

@@ -28,6 +28,7 @@ public class MainGame extends ApplicationAdapter {
     float targetScrollY = 0f; // Y objetivo al que debe llegar la cámara/tablero
     float scrollSpeed = 10f;  // Velocidad de interpolación (lerp)
     int filaLogicaJugador = 0; // Fila real en el tablero
+    GestorEnemigos gestorEnemigos;
 
     // Pieza
     Texture atlasTextura;
@@ -49,7 +50,7 @@ public class MainGame extends ApplicationAdapter {
         batch = new SpriteBatch();
         touchPoint = new Vector3();
 
-        // Cargar tablero puro (ya no necesita Wrap Repeat porque lo dibujamos en bucle)
+        // Cargar tablero puro
         texturaTablero = new Texture(Gdx.files.internal("tablero.png"));
         texturaTablero.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
@@ -60,6 +61,9 @@ public class MainGame extends ApplicationAdapter {
         // Pieza del jugador (Rey)
         atlasTextura = new Texture("test.png");
         piezaRey = new TextureRegion(atlasTextura, 64, 73);
+
+        gestorEnemigos = new GestorEnemigos();
+        gestorEnemigos.generarEnemigo(TipoPieza.TORRE, 2, 5);
 
         camera = new OrthographicCamera();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
@@ -130,12 +134,20 @@ public class MainGame extends ApplicationAdapter {
 
             if (tappedCol >= 0 && tappedCol < COLS) {
                 jugadorCol = tappedCol;
-
-                // El jugador avanza una fila
-                filaLogicaJugador++;
-
-                // Actualizamos el objetivo de scroll para que el tablero baje
+                filaLogicaJugador++; // El jugador avanza
                 targetScrollY = filaLogicaJugador * CELL_H;
+
+                // Revisamos si la casilla a la que nos movimos es muerte segura
+                if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
+                    // Hay que cambiar esto, ya que es soslo para mostrar en consola, en una fase de prueba
+                    System.out.println("¡HACKE MATEEEE! Te metiste en la zona de ataque.");
+                } else {
+                    System.out.println("Avanzaste a una zona segura.");
+                }
+
+                // Limpiamos los enemigos que ya dejamos atrás
+                int filaBase = (int) (scrollY / CELL_H);
+                gestorEnemigos.limpiarEnemigosPasados(filaBase);
             }
         }
     }

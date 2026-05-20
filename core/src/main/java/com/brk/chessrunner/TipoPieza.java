@@ -6,5 +6,5 @@ public enum TipoPieza {
     ALFIL,
     TORRE,
     REINA,
-    REY
+
 };

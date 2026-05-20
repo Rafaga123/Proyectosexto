@@ -13,6 +13,15 @@ public class Enemigo {
     // Metodo que recibe la posicion donde se quiere mover el juegador, regresara un valor
     // Positivo, True, si un enemigo esta atacando esa posicion.
     public boolean atacaCasilla(int targetCol, int targetFila) {
+        int difCol = Math.abs(targetCol - colLogica);
+        int difFila = Math.abs(targetFila - filLogica);
+
+        // limite y control visual para balanceo: Ninguna pieza puede atacarte desde más de 4 casillas de distancia vertical.
+        // Esto evita muertes instantáneas por piezas que aparecen fuera de cámara.
+        // Esto esta en revision
+        if (difFila > 5) {
+            return false;
+        }
         switch (tipo) {
             case TORRE:
                 // Una torre ataca toda su misma columna y toda su misma fila
@@ -39,10 +48,6 @@ public class Enemigo {
                 // La reina combina los movimientos de torre y alfil
                 return (targetCol == colLogica) || (targetFila == filLogica) ||
                     Math.abs(targetCol - colLogica) == Math.abs(targetFila - filLogica);
-
-            case REY:
-                // El rey ataca a un radio de 1 casilla a su alrededor
-                return Math.abs(targetCol - colLogica) <= 1 && Math.abs(targetFila - filLogica) <= 1;
 
             default:
                 return false;

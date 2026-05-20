@@ -25,6 +25,19 @@ public class GestorEnemigos {
         return false; // Si revisa todos y ninguno ataca, estás a salvo
     }
 
+    // Metodo para destruir una pieza si el jugador cae sobre ella
+    public void intentarCapturar(int col, int fila) {
+        // Iteramos en reversa porque vamos a eliminar elementos del Array
+        for (int i = activos.size - 1; i >= 0; i--) {
+            Enemigo e = activos.get(i);
+            if (e.colLogica == col && e.filLogica == fila) {
+                activos.removeIndex(i);
+                System.out.println("¡Pieza capturada en la columna " + col + "!");
+                break; // Solo puede haber una pieza por casilla, así que detenemos la búsqueda
+            }
+        }
+    }
+
     // Limpieza de memoria
     public void limpiarEnemigosPasados(int filaBasePantalla) {
         // Iteramos el array de atrás hacia adelante para poder borrar elementos sin que se rompa el bucle
@@ -38,7 +51,7 @@ public class GestorEnemigos {
     }
 
     // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
-    public void intentarGenerarEnemigos(int filaJugador) {
+    public void intentarGenerarEnemigos(int filaJugador, int jugadorCol) {
         // Generamos los enemigos 6 filas por delante de la posicion actual del jugador
         int filaAparicion = filaJugador + 6;
 

@@ -39,7 +39,6 @@ public class MainGame extends ApplicationAdapter {
     GestorEnemigos gestorEnemigos;
 
     // Pieza
-    Texture atlasTextura;
     TextureRegion piezaRey;
 
     // --- CONFIGURACIÓN DE COLOR ---
@@ -77,10 +76,6 @@ public class MainGame extends ApplicationAdapter {
         texturaTablero.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         SombraA = new Texture(Gdx.files.internal("sombra_a.png"));
         SombraB = new Texture(Gdx.files.internal("sombra_b.png"));
-
-        // Pieza del jugador
-        atlasTextura = new Texture("test.png"); // Cambiar por pieza real luego
-        piezaRey = new TextureRegion(atlasTextura, 64, 73);
 
         // --- CARGA DE PIEZAS ENEMIGAS ---
         texturaPiezasNegras = new Texture(Gdx.files.internal("piezas_negras.png"));
@@ -223,24 +218,27 @@ public class MainGame extends ApplicationAdapter {
                     Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 &&
                     (diffCol != 0 || diffRow != 0)) {
 
-                    // Movimiento Válido -> Actualizamos el cerebro
                     jugadorCol = targetCol;
                     filaLogicaJugador += diffRow;
-
-                    // Actualizamos el scroll (el tablero bajará si subimos, o subirá si bajamos)
                     targetScrollY = filaLogicaJugador * CELL_H;
 
-                    // Solo generamos enemigos si avanzamos hacia arriba
-                    if (diffRow > 0) {
-                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador);
-                    }
+                    // Intentamos capturar
+                    // Eliminamos cualquier pieza que esté en la casilla destino
+                    gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador); // Llamado a la funcion
 
-                    // --- SUPERVIVENCIA ---
+                    // Supervivencia
+                    // Evaluamos la amenaza DESPUÉS de la posible captura
                     if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
-                        System.out.println("¡HACKE MATEEEE! Game Over."); // Mensaje interno de consola en bugcatr
+                        System.out.println("¡JAQUE MATE! Game Over.");
                         estadoActual = EstadoJuego.GAME_OVER;
                     } else {
                         System.out.println("Avanzaste a una zona segura.");
+                    }
+
+                    // Generacion
+                    // Generamos piezas solo si avanzamos, pasándole también la columna actual
+                    if (diffRow > 0) {
+                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol);
                     }
 
                     int filaBase = (int) (scrollY / CELL_H);
@@ -276,23 +274,28 @@ public class MainGame extends ApplicationAdapter {
      * @param color 1 para negro, 2 para blanco.
      */
     public void asignarSetDePiezas(int color) {
+        // Textura para los enemigos
         Texture texturaFuente = (color == 1) ? texturaPiezasNegras : texturaPiezasBlancas;
+        // Textura para el jugador (siempre el color opuesto)
+        Texture texturaJugador = (color == 1) ? texturaPiezasBlancas : texturaPiezasNegras;
 
         // Medida exacta de las piezas
         int anchoPieza = 320;
         int altoPieza = 320;
 
-        // libGDX corta la imagen automáticamente usando esa medida
-        TextureRegion[][] matrizPiezas = TextureRegion.split(texturaFuente, anchoPieza, altoPieza);
+        // libGDX corta ambas imágenes automáticamente usando esa medida
+        TextureRegion[][] matrizEnemigos = TextureRegion.split(texturaFuente, anchoPieza, altoPieza);
+        TextureRegion[][] matrizJugador = TextureRegion.split(texturaJugador, anchoPieza, altoPieza);
 
-        // IMPORTANTE: Asegúrate de que este índice coincida con el orden visual de tu PNG
-        // Asumiendo que están en la fila 0 y ordenadas de izquierda a derecha:
-        regionesEnemigos.put(TipoPieza.PEON, matrizPiezas[1][2]);
-        regionesEnemigos.put(TipoPieza.TORRE, matrizPiezas[1][0]);
-        regionesEnemigos.put(TipoPieza.CABALLO, matrizPiezas[0][1]);
-        regionesEnemigos.put(TipoPieza.ALFIL, matrizPiezas[1][1]);
-        regionesEnemigos.put(TipoPieza.REINA, matrizPiezas[0][2]);
-        regionesEnemigos.put(TipoPieza.REY, matrizPiezas[0][0]);
+        // Asignamos los enemigos usando la matriz de enemigos
+        regionesEnemigos.put(TipoPieza.PEON, matrizEnemigos[1][2]);
+        regionesEnemigos.put(TipoPieza.TORRE, matrizEnemigos[1][0]);
+        regionesEnemigos.put(TipoPieza.CABALLO, matrizEnemigos[0][1]);
+        regionesEnemigos.put(TipoPieza.ALFIL, matrizEnemigos[1][1]);
+        regionesEnemigos.put(TipoPieza.REINA, matrizEnemigos[0][2]);
+
+        // Asignamos la pieza del jugador (Rey) usando la matriz del jugador
+        piezaRey = matrizJugador[0][0];
     }
 
     // Alternar color en config:
@@ -307,7 +310,6 @@ public class MainGame extends ApplicationAdapter {
         texturaTablero.dispose();
         SombraA.dispose();
         SombraB.dispose();
-        atlasTextura.dispose();
         texturaPiezasNegras.dispose();
         texturaPiezasBlancas.dispose();
     }

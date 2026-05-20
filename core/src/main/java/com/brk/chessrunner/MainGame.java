@@ -63,6 +63,9 @@ public class MainGame extends ApplicationAdapter {
     static final float CELL_W = WORLD_WIDTH / COLS;
     static final float CELL_H = CELL_W;
     static final int JUGADOR_FILA_VIS = 1;
+    boolean isDragging = false;
+    float dragX = 0f;
+    float dragY = 0f;
 
     @Override
     public void create() {
@@ -162,37 +165,87 @@ public class MainGame extends ApplicationAdapter {
             }
         }
 
-        // --- DIBUJO DEL JUGADOR ---
-        float px = jugadorCol * CELL_W;
-        float py = JUGADOR_FILA_VIS * CELL_H;
-        batch.draw(piezaRey, px, py, CELL_W, CELL_H);
+        // --- DIBUJAR JUGADOR ---
+        if (isDragging) {
+            // Dibuja la pieza flotando en la posición del dedo
+            batch.draw(piezaRey, dragX, dragY, CELL_W, CELL_H);
+        } else {
+            // Dibuja la pieza encajada en su cuadrícula
+            float px = jugadorCol * CELL_W;
+            float py = JUGADOR_FILA_VIS * CELL_H;
+            batch.draw(piezaRey, px, py, CELL_W, CELL_H);
+        }
 
         batch.end();
     }
 
     private void handleInput() {
-        if (Gdx.input.justTouched()) {
+        // Conficional para determinar si el dedo está tocando la pantalla
+        if (Gdx.input.isTouched()) {
             touchPoint.set(Gdx.input.getX(), Gdx.input.getY(), 0);
             viewport.unproject(touchPoint);
 
-            int tappedCol = (int) (touchPoint.x / CELL_W);
+            // Verificar si se esta tocando la pantalla
+            if (Gdx.input.justTouched()) {
+                float px = jugadorCol * CELL_W;
+                float py = JUGADOR_FILA_VIS * CELL_H;
 
-            if (tappedCol >= 0 && tappedCol < COLS) {
-                jugadorCol = tappedCol;
-                filaLogicaJugador++; // El jugador avanza
-                targetScrollY = filaLogicaJugador * CELL_H;
-
-                // Revisamos si la casilla a la que nos movimos es muerte segura
-                if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
-                    System.out.println("¡JAQUEEEE! Game Over.");
-                    estadoActual = EstadoJuego.GAME_OVER; // ¡El juego se congela visualmente!
-                } else {
-                    System.out.println("Avanzaste a una zona segura.");
+                // Verificar si el toque fue dentro de los límites del Rey
+                if (touchPoint.x >= px && touchPoint.x <= px + CELL_W &&
+                    touchPoint.y >= py && touchPoint.y <= py + CELL_H) {
+                    isDragging = true;
                 }
+            }
 
-                // Limpiamos los enemigos que ya dejamos atrás
-                int filaBase = (int) (scrollY / CELL_H);
-                gestorEnemigos.limpiarEnemigosPasados(filaBase);
+            // Mientras se arrastra, se actualiza las coordenadas del dibujo
+            if (isDragging) {
+                // Centramos la pieza en el dedo
+                dragX = touchPoint.x - (CELL_W / 2);
+                dragY = touchPoint.y - (CELL_H / 2);
+            }
+
+        } else {
+            // Verificar si se ha soltado la pieza
+            if (isDragging) {
+                isDragging = false;
+
+                // Calculamos en qué celda visual cayó el dedo
+                int targetCol = (int) (touchPoint.x / CELL_W);
+                int targetVisualRow = (int) (touchPoint.y / CELL_H);
+
+                // Calculamos cuántas casillas intentó moverse
+                int diffCol = targetCol - jugadorCol;
+                int diffRow = targetVisualRow - JUGADOR_FILA_VIS;
+
+                // REGLAS DEL REY: Máximo 1 casilla en cualquier dirección (y debe moverse al menos 1)
+                // Hay que modificar y limitar el movimiento hacia atras
+                if (targetCol >= 0 && targetCol < COLS &&
+                    Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 &&
+                    (diffCol != 0 || diffRow != 0)) {
+
+                    // Movimiento Válido -> Actualizamos el cerebro
+                    jugadorCol = targetCol;
+                    filaLogicaJugador += diffRow;
+
+                    // Actualizamos el scroll (el tablero bajará si subimos, o subirá si bajamos)
+                    targetScrollY = filaLogicaJugador * CELL_H;
+
+                    // Solo generamos enemigos si avanzamos hacia arriba
+                    if (diffRow > 0) {
+                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador);
+                    }
+
+                    // --- SUPERVIVENCIA ---
+                    if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
+                        System.out.println("¡HACKE MATEEEE! Game Over."); // Mensaje interno de consola en bugcatr
+                        estadoActual = EstadoJuego.GAME_OVER;
+                    } else {
+                        System.out.println("Avanzaste a una zona segura.");
+                    }
+
+                    int filaBase = (int) (scrollY / CELL_H);
+                    gestorEnemigos.limpiarEnemigosPasados(filaBase);
+                }
             }
         }
     }

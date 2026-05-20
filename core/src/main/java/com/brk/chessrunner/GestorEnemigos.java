@@ -1,5 +1,6 @@
 package com.brk.chessrunner;
 
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Array;
 
 public class GestorEnemigos {
@@ -34,5 +35,35 @@ public class GestorEnemigos {
                 activos.removeIndex(i);
             }
         }
+    }
+
+    // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
+    public void intentarGenerarEnemigos(int filaJugador) {
+        // Generamos los enemigos 6 filas por delante de la posicion actual del jugador
+        int filaAparicion = filaJugador + 6;
+
+        // 40% de probabilidades de generar una pieza nueva en esta fila
+        if (MathUtils.randomBoolean(0.4f)) {
+            int colAleatoria = MathUtils.random(0, 4);
+
+            // Elegimos un tipo de pieza al azar
+            TipoPieza[] tiposPosibles = {TipoPieza.PEON, TipoPieza.TORRE, TipoPieza.CABALLO, TipoPieza.ALFIL};
+            TipoPieza tipoElegido = tiposPosibles[MathUtils.random(0, tiposPosibles.length - 1)];
+
+            // Condicional para evitar poner dos enemigos exactamente en la misma casilla
+            if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
+                generarEnemigo(tipoElegido, colAleatoria, filaAparicion);
+            }
+        }
+    }
+
+    // Metodo para verificar si una casilla ya esta ocupada
+    private boolean hayEnemigoEnCasilla(int col, int fila) {
+        for (Enemigo e : activos) {
+            if (e.colLogica == col && e.filLogica == fila) {
+                return true;
+            }
+        }
+        return false;
     }
 }

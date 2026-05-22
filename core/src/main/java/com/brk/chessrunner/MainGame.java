@@ -59,6 +59,7 @@ public class MainGame extends ApplicationAdapter {
     // Jugador
     int jugadorCol = 2;
     static final int COLS = 5;
+    int filaMaximaAlcanzada = 0;
     static final float CELL_W = WORLD_WIDTH / COLS;
     static final float CELL_H = CELL_W;
     static final int JUGADOR_FILA_VIS = 1;
@@ -85,7 +86,7 @@ public class MainGame extends ApplicationAdapter {
 
         // Inicializar Gestor
         gestorEnemigos = new GestorEnemigos();
-        gestorEnemigos.generarEnemigo(TipoPieza.ALFIL, 2, 5);
+        // gestorEnemigos.generarEnemigo(TipoPieza.ALFIL, 2, 5);
 
         camera = new OrthographicCamera();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
@@ -204,27 +205,37 @@ public class MainGame extends ApplicationAdapter {
             if (isDragging) {
                 isDragging = false;
 
-                // Calculamos en qué celda visual cayó el dedo
                 int targetCol = (int) (touchPoint.x / CELL_W);
                 int targetVisualRow = (int) (touchPoint.y / CELL_H);
 
-                // Calculamos cuántas casillas intentó moverse
                 int diffCol = targetCol - jugadorCol;
                 int diffRow = targetVisualRow - JUGADOR_FILA_VIS;
 
-                // REGLAS DEL REY: Máximo 1 casilla en cualquier dirección (y debe moverse al menos 1)
-                // Hay que modificar y limitar el movimiento hacia atras
+                // Calculamos a que fila del mundo real esta intentando ir
+                int nuevaFilaLogica = filaLogicaJugador + diffRow;
+
+                // REGLA DE RETROCESO: No puede bajar mas de 1 casilla de su record maximo, ni bajar de 0
+                int limiteInferior = Math.max(0, filaMaximaAlcanzada - 1);
+                boolean retrocesoValido = nuevaFilaLogica >= limiteInferior;
+
+                // REGLAS DEL REY: Maximo 1 casilla en cualquier direccion
                 if (targetCol >= 0 && targetCol < COLS &&
                     Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 &&
-                    (diffCol != 0 || diffRow != 0)) {
+                    (diffCol != 0 || diffRow != 0) && retrocesoValido) {
 
                     jugadorCol = targetCol;
-                    filaLogicaJugador += diffRow;
+                    filaLogicaJugador = nuevaFilaLogica;
+
+                    // Actualizamos nuestro record de altura
+                    if (filaLogicaJugador > filaMaximaAlcanzada) {
+                        filaMaximaAlcanzada = filaLogicaJugador;
+                    }
+
                     targetScrollY = filaLogicaJugador * CELL_H;
 
                     // Intentamos capturar
                     // Eliminamos cualquier pieza que esté en la casilla destino
-                    gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador); // Llamado a la funcion
+                    gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
 
                     // Supervivencia
                     // Evaluamos la amenaza DESPUÉS de la posible captura
@@ -261,6 +272,7 @@ public class MainGame extends ApplicationAdapter {
         scrollY = 0f;
         targetScrollY = 0f;
         filaLogicaJugador = 0;
+        filaMaximaAlcanzada = 0;
         jugadorCol = 2; // Volvemos al centro
 
         // Limpiamos la memoria de enemigos

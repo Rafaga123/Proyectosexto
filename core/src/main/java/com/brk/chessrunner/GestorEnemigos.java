@@ -22,7 +22,21 @@ public class GestorEnemigos {
                 return true; // Basta con que UNO ataque la casilla para morir
             }
         }
-        return false; // Si revisa todos y ninguno ataca, estás a salvo
+        return false; // Si revisa todos y ninguno ataca, el jugador a salvo
+    }
+
+    // verifica si podemos capturar una pieza de forma segura
+    public boolean estaCasillaDefendida(int col, int fila) {
+        for (Enemigo e : activos) {
+            // Si el enemigo está en la casilla exacta a la que nos queremos mover, lo IGNORAMOS
+            if (e.colLogica == col && e.filLogica == fila) continue;
+
+            // Si cualquier OTRO enemigo tiene esta casilla en su línea de ataque, es suicidio ir
+            if (e.atacaCasilla(col, fila)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Metodo para destruir una pieza si el jugador cae sobre ella
@@ -49,23 +63,87 @@ public class GestorEnemigos {
             }
         }
     }
+    // Algoritmo de Búsqueda en Anchura (BFS) para garantizar que el nivel es pasable
+    private boolean existeCaminoSeguro(int colInicio, int filaInicio, int filaMeta) {
+        // Calculo de cuántas filas hay de diferencia para dimensionar nuestro mapa de visitados
+        int filasDeDistancia = (filaMeta - filaInicio) + 1;
+        if (filasDeDistancia <= 0) return true;
+
+        boolean[][] visitado = new boolean[5][filasDeDistancia];
+        Array<int[]> cola = new Array<>();
+
+        // Empezamos desde la posición actual del jugador
+        cola.add(new int[]{colInicio, filaInicio});
+        visitado[colInicio][0] = true;
+
+        // Posibles movimientos del Rey que nos hacen avanzar o esquivar (Se excluye calcular hacia atrás para optimizar)
+        int[][] movimientos = {
+            {0, 1}, {-1, 1}, {1, 1}, // Avanzar recto, diagonal izq, diagonal der
+            {-1, 0}, {1, 0}          // Esquivar lateral izq, lateral der
+        };
+
+        while (cola.size > 0) {
+            int[] actual = cola.removeIndex(0);
+            int c = actual[0];
+            int f = actual[1];
+
+            // Si un camino logró llegar a la fila donde queremos poner la pieza nueva, el nivel es pasable
+            if (f >= filaMeta) {
+                return true;
+            }
+
+            for (int[] mov : movimientos) {
+                int nuevaCol = c + mov[0];
+                int nuevaFila = f + mov[1];
+
+                // Verificamos que no se salga de los límites del tablero (0 a 4) y no pase de la meta
+                if (nuevaCol >= 0 && nuevaCol < 5 && nuevaFila <= filaMeta) {
+                    int indiceFilaMatriz = nuevaFila - filaInicio;
+
+                    // Si la fila está dentro del rango y no la hemos evaluado aún
+                    if (indiceFilaMatriz >= 0 && indiceFilaMatriz < filasDeDistancia && !visitado[nuevaCol][indiceFilaMatriz]) {
+
+                        // REGLA CLAVE: La casilla es transitable si no está amenazada por un defensor.
+                        // Esto permite al BFS considerar caminos donde el jugador captura una pieza siempre y cuando esa pieza no esté protegida por otra
+                        if (!estaCasillaDefendida(nuevaCol, nuevaFila)) {
+                            visitado[nuevaCol][indiceFilaMatriz] = true;
+                            cola.add(new int[]{nuevaCol, nuevaFila});
+                        }
+                    }
+                }
+            }
+        }
+
+        // Si la cola se vacía y nunca llegamos a la fila meta, significa que es un bloqueo imposible
+        return false;
+    }
 
     // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
-    public void intentarGenerarEnemigos(int filaJugador, int jugadorCol) {
-        // Generamos los enemigos 6 filas por delante de la posicion actual del jugador
+    public void intentarGenerarEnemigos(int filaJugador, int colJugador) {
         int filaAparicion = filaJugador + 6;
+        int intentosDeGeneracion = 3; // Balancear
 
-        // 40% de probabilidades de generar una pieza nueva en esta fila
-        if (MathUtils.randomBoolean(0.4f)) {
-            int colAleatoria = MathUtils.random(0, 4);
+        for (int i = 0; i < intentosDeGeneracion; i++) {
+            // 60% de probabilidad por cada intento de colocar una pieza
+            if (MathUtils.randomBoolean(0.8f)) { // Balancear
+                int colAleatoria = MathUtils.random(0, 4);
+                TipoPieza[] tiposPosibles = {TipoPieza.PEON, TipoPieza.TORRE, TipoPieza.CABALLO, TipoPieza.ALFIL, TipoPieza.REINA};
+                TipoPieza tipoElegido = tiposPosibles[MathUtils.random(0, tiposPosibles.length - 1)];
 
-            // Elegimos un tipo de pieza al azar
-            TipoPieza[] tiposPosibles = {TipoPieza.PEON, TipoPieza.TORRE, TipoPieza.CABALLO, TipoPieza.ALFIL};
-            TipoPieza tipoElegido = tiposPosibles[MathUtils.random(0, tiposPosibles.length - 1)];
+                // Si la casilla esta vacia, intentamos colocarla
+                if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
+                    Enemigo nuevoEnemigo = new Enemigo(tipoElegido, colAleatoria, filaAparicion);
+                    activos.add(nuevoEnemigo);
 
-            // Condicional para evitar poner dos enemigos exactamente en la misma casilla
-            if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
-                generarEnemigo(tipoElegido, colAleatoria, filaAparicion);
+                    // Evaluamos de inmediato si esta nueva pieza cierra por completo el tablero
+                    boolean esPasable = existeCaminoSeguro(colJugador, filaJugador, filaAparicion);
+
+                    // Si el tablero se vuelve imposible, eliminamos y desocupamos ese espacio
+                    if (!esPasable) {
+                        activos.removeValue(nuevoEnemigo, true);
+                        System.out.println("Generacion vetada: El " + tipoElegido + " bloqueaba todos los caminos.");
+                    }
+                }
             }
         }
     }

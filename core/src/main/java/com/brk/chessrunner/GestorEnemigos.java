@@ -120,28 +120,34 @@ public class GestorEnemigos {
 
     // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
     public void intentarGenerarEnemigos(int filaJugador, int colJugador) {
+        // LÍMITE DE POBLACIÓN: Si hay 10 o más enemigos en pantalla, no generamos más.
+        // Esto evita la saturación extrema del 100% que veías en la imagen.
+        if (activos.size >= 10) {
+            return;
+        }
+
         int filaAparicion = filaJugador + 6;
-        int intentosDeGeneracion = 3; // Balancear
+
+        // Bajamos a 2 intentos por fila para dar más espacio orgánico
+        int intentosDeGeneracion = 2;
 
         for (int i = 0; i < intentosDeGeneracion; i++) {
-            // 60% de probabilidad por cada intento de colocar una pieza
-            if (MathUtils.randomBoolean(0.8f)) { // Balancear
+            // 50% de probabilidad base por cada intento de colocar una pieza
+            if (MathUtils.randomBoolean(0.5f)) {
                 int colAleatoria = MathUtils.random(0, 4);
-                TipoPieza[] tiposPosibles = {TipoPieza.PEON, TipoPieza.TORRE, TipoPieza.CABALLO, TipoPieza.ALFIL, TipoPieza.REINA};
-                TipoPieza tipoElegido = tiposPosibles[MathUtils.random(0, tiposPosibles.length - 1)];
 
-                // Si la casilla esta vacia, intentamos colocarla
+                // Usamos nuestro nuevo sistema de pesos en lugar del arreglo plano
+                TipoPieza tipoElegido = obtenerPiezaAleatoria();
+
                 if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
                     Enemigo nuevoEnemigo = new Enemigo(tipoElegido, colAleatoria, filaAparicion);
                     activos.add(nuevoEnemigo);
 
-                    // Evaluamos de inmediato si esta nueva pieza cierra por completo el tablero
                     boolean esPasable = existeCaminoSeguro(colJugador, filaJugador, filaAparicion);
 
-                    // Si el tablero se vuelve imposible, eliminamos y desocupamos ese espacio
                     if (!esPasable) {
                         activos.removeValue(nuevoEnemigo, true);
-                        System.out.println("Generacion vetada: El " + tipoElegido + " bloqueaba todos los caminos.");
+                        System.out.println("Generación vetada: El " + tipoElegido + " bloqueaba todos los caminos.");
                     }
                 }
             }
@@ -156,5 +162,25 @@ public class GestorEnemigos {
             }
         }
         return false;
+    }
+
+    // Sistema de pesos para balancear la aparición de piezas
+    private TipoPieza obtenerPiezaAleatoria() {
+        int tirada = MathUtils.random(1, 100);
+
+        // 45% de probabilidad de ser un Peón
+        if (tirada <= 45) return TipoPieza.PEON;
+
+        // 25% de probabilidad de ser un Caballo
+        if (tirada <= 70) return TipoPieza.CABALLO;
+
+        // 15% de probabilidad de ser un Alfil
+        if (tirada <= 85) return TipoPieza.ALFIL;
+
+        // 10% de probabilidad de ser una Torre
+        if (tirada <= 95) return TipoPieza.TORRE;
+
+        // Solo 5% de probabilidad de ser una Reina
+        return TipoPieza.REINA;
     }
 }

@@ -146,4 +146,39 @@ public class DesktopDatabaseManager implements LocalDatabase {
             System.err.println("Error al vincular cuenta en SQLite: " + e.getMessage());
         }
     }
+
+    @Override
+    public java.util.List<PartidaLocal> obtenerPartidasNoSincronizadas(String usuarioId) {
+        java.util.List<PartidaLocal> lista = new java.util.ArrayList<>();
+        String sql = "SELECT * FROM partida_local WHERE usuario_id = ? AND sincronizado = 0";
+
+        try (java.sql.PreparedStatement pstmt = conexion.prepareStatement(sql)) {
+            pstmt.setString(1, usuarioId);
+            try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(new PartidaLocal(
+                        rs.getString("id"),
+                        rs.getString("usuario_id"),
+                        rs.getInt("puntuacion"),
+                        rs.getInt("tiempo_sobrevivido"),
+                        false
+                    ));
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            System.err.println("Error al obtener partidas pendientes: " + e.getMessage());
+        }
+        return lista;
+    }
+
+    @Override
+    public void marcarComoSincronizada(String partidaId) {
+        String sql = "UPDATE partida_local SET sincronizado = 1 WHERE id = ?";
+        try (java.sql.PreparedStatement pstmt = conexion.prepareStatement(sql)) {
+            pstmt.setString(1, partidaId);
+            pstmt.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            System.err.println("Error al marcar partida como sincronizada: " + e.getMessage());
+        }
+    }
 }

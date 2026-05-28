@@ -73,9 +73,15 @@ public class MainMenuScreen implements Screen {
         botonSincronizar.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                // Instanciamos el modal y le decimos que se muestre en el stage principal
-                LoginDialog dialog = new LoginDialog("Iniciar Sesión", skin, db, juego);
-                dialog.show(stage);
+                // Si el ID empieza con "guest", no está logueado en la nube
+                if (usuario != null && usuario.getId().startsWith("guest")) {
+                    LoginDialog dialog = new LoginDialog("Iniciar Sesion", skin, db, juego);
+                    dialog.show(stage);
+                } else {
+                    // Si ya es un usuario real, abrimos el SyncDialog
+                    SyncDialog dialog = new SyncDialog("Sincronizando", skin, db);
+                    dialog.show(stage);
+                }
             }
         });
     }

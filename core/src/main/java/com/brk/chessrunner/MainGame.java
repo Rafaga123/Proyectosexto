@@ -11,8 +11,20 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.badlogic.gdx.utils.ObjectMap;
+import com.brk.chessrunner.database.LocalDatabase;
+import com.brk.chessrunner.database.PartidaLocal;
+import com.brk.chessrunner.database.UsuarioLocal;
+
+import java.util.UUID;
 
 public class MainGame extends ApplicationAdapter {
+
+    private LocalDatabase db; // <-- Variable para utilizar la base de datos
+
+    // Modificamos el constructor para recibir la base de datos
+    public MainGame(LocalDatabase db) {
+        this.db = db;
+    }
 
     SpriteBatch batch;
     OrthographicCamera camera;
@@ -91,6 +103,19 @@ public class MainGame extends ApplicationAdapter {
         camera = new OrthographicCamera();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
         camera.position.set(WORLD_WIDTH / 2f, WORLD_HEIGHT / 2f, 0);
+
+        System.out.println("Intentando conectar con la API...");
+        com.brk.chessrunner.network.ApiClient.login("123@gmail.com", "123", new com.brk.chessrunner.network.ApiClient.ApiCallback() {
+            @Override
+            public void onExito(com.badlogic.gdx.utils.JsonValue respuesta) {
+                System.out.println("¡API RESPONDIÓ OK! Datos: " + respuesta.toString());
+            }
+
+            @Override
+            public void onError(String mensajeError) {
+                System.err.println("API ERROR: " + mensajeError);
+            }
+        });
     }
 
     @Override
@@ -242,6 +267,22 @@ public class MainGame extends ApplicationAdapter {
                     if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
                         System.out.println("¡JAQUE MATE! Game Over.");
                         estadoActual = EstadoJuego.GAME_OVER;
+
+                        // Guardar partida en la base de datos
+                        // Como aún no tenemos login, pondremos un usuario "invitado" temporalmente
+                        UsuarioLocal jugadorActual = db.obtenerUsuarioActual();
+
+                        if (jugadorActual != null) {
+                            String idPartida = UUID.randomUUID().toString();
+                            int puntuacion = filaMaximaAlcanzada * 10;
+                            int tiempo = 0;
+
+                            // 2. Asociamos la partida a su ID real
+                            PartidaLocal nuevaPartida = new PartidaLocal(idPartida, jugadorActual.getId(), puntuacion, tiempo, false);
+                            db.guardarPartida(nuevaPartida);
+                        } else {
+                            System.err.println("No se pudo guardar: No hay usuario activo.");
+                        }
                     } else {
                         System.out.println("Avanzaste a una zona segura.");
                     }

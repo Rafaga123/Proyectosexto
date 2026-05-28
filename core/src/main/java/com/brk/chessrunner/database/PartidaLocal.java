@@ -6,7 +6,7 @@ public class PartidaLocal {
     private int puntuacion;
 
     private int tiempoSobrevivido;
-    private boolean sincronizado; // vital para saber si enviarla a tu API luego
+    private boolean sincronizado; // Controla si las partidas del usuario están sincronizadas
 
     public PartidaLocal(String id, String usuarioId, int puntuacion, int tiempoSobrevivido, boolean sincronizado) {
         this.id = id;

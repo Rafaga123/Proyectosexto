@@ -50,6 +50,8 @@ dependencies {
     implementation("org.lwjgl:lwjgl-opengl:$lwjgl3Version")
     implementation("org.lwjgl:lwjgl-stb:$lwjgl3Version")
   }
+
+  implementation "org.xerial:sqlite-jdbc:3.53.1.0"
 }
 
 def os = System.properties['os.name'].toLowerCase(Locale.ROOT)

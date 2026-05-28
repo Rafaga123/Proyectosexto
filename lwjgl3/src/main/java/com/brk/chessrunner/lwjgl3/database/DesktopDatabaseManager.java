@@ -109,4 +109,41 @@ public class DesktopDatabaseManager implements LocalDatabase {
             System.err.println("Error al guardar la partida: " + e.getMessage());
         }
     }
+
+    @Override
+    public void vincularCuenta(UsuarioLocal usuarioApi) {
+        try {
+            // 1. Obtenemos el ID del invitado actual
+            String idInvitado = null;
+            try (java.sql.Statement stmt = conexion.createStatement();
+                 java.sql.ResultSet rs = stmt.executeQuery("SELECT id FROM usuario_local WHERE sesion_activa = 1")) {
+                if (rs.next()) {
+                    idInvitado = rs.getString("id");
+                }
+            }
+
+            if (idInvitado != null) {
+                // 2. Actualizamos las partidas para que apunten al nuevo ID real
+                String sqlPartidas = "UPDATE partida_local SET usuario_id = ? WHERE usuario_id = ?";
+                try (java.sql.PreparedStatement pstmt = conexion.prepareStatement(sqlPartidas)) {
+                    pstmt.setString(1, usuarioApi.getId());
+                    pstmt.setString(2, idInvitado);
+                    pstmt.executeUpdate();
+                }
+
+                // 3. Actualizamos el perfil local con los datos de PostgreSQL
+                String sqlUsuario = "UPDATE usuario_local SET id = ?, alias = ?, correo = ? WHERE id = ?";
+                try (java.sql.PreparedStatement pstmt = conexion.prepareStatement(sqlUsuario)) {
+                    pstmt.setString(1, usuarioApi.getId());
+                    pstmt.setString(2, usuarioApi.getAlias());
+                    pstmt.setString(3, usuarioApi.getCorreo());
+                    pstmt.setString(4, idInvitado);
+                    pstmt.executeUpdate();
+                }
+                System.out.println("Cuenta vinculada exitosamente. Partidas migradas al ID: " + usuarioApi.getId());
+            }
+        } catch (java.sql.SQLException e) {
+            System.err.println("Error al vincular cuenta en SQLite: " + e.getMessage());
+        }
+    }
 }

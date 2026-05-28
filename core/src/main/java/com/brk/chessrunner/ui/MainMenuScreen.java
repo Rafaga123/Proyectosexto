@@ -3,12 +3,15 @@ package com.brk.chessrunner.ui;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.brk.chessrunner.GameScreen;
 import com.brk.chessrunner.MainGame;
 import com.brk.chessrunner.database.LocalDatabase;
 import com.brk.chessrunner.database.UsuarioLocal;
@@ -56,7 +59,25 @@ public class MainMenuScreen implements Screen {
         tabla.add(botonJugar).width(200).height(50).padBottom(15).row();
         tabla.add(botonSincronizar).width(200).height(50).row();
 
-        // Más adelante le daremos función a los botones
+        botonJugar.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeListener.ChangeEvent event, Actor actor) {
+                // Cambia la vista al tablero de juego
+                juego.setScreen(new GameScreen(juego));
+            }
+        });
+
+        // Asegúrate de importar com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+        // y com.badlogic.gdx.scenes.scene2d.Actor;
+
+        botonSincronizar.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                // Instanciamos el modal y le decimos que se muestre en el stage principal
+                LoginDialog dialog = new LoginDialog("Iniciar Sesión", skin, db, juego);
+                dialog.show(stage);
+            }
+        });
     }
 
     @Override

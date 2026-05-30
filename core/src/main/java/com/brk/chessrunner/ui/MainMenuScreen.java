@@ -16,6 +16,8 @@ import com.brk.chessrunner.MainGame;
 import com.brk.chessrunner.database.LocalDatabase;
 import com.brk.chessrunner.database.UsuarioLocal;
 
+import org.w3c.dom.Text;
+
 public class MainMenuScreen implements Screen {
 
     private final MainGame juego;
@@ -34,8 +36,15 @@ public class MainMenuScreen implements Screen {
         stage = new Stage(new ScreenViewport());
         Gdx.input.setInputProcessor(stage); // Permite que los botones reciban clics
 
-        // Cargamos el diseño de los botones
-        skin = new Skin(Gdx.files.internal("ui/uiskin.json"));
+        try{
+            // Cargamos el diseño de los botones
+            skin = new Skin(Gdx.files.internal("ui/uiskin.json"));
+
+        } catch(Exception e){
+            Gdx.app.error("UI_ERROR","Error cargando el uiskin.json"+e.getMessage());
+        }
+
+
 
         // Table ayuda a centrar y ordenar los botones fácilmente
         Table tabla = new Table();
@@ -48,16 +57,24 @@ public class MainMenuScreen implements Screen {
 
         // Creamos los elementos visuales
         Label tituloLabel = new Label("CHESS RUNNER", skin);
+        tituloLabel.setFontScale(2.0f);
         Label userLabel = new Label("Jugador: " + aliasMostrar, skin);
 
         TextButton botonJugar = new TextButton("Jugar", skin);
+        TextButton botonConfiguracion= new TextButton("Opciones",skin);
         TextButton botonSincronizar = new TextButton("Sincronizar / Login", skin);
+        TextButton botonSalida= new TextButton("Salir",skin);
+
 
         // Los añadimos a la tabla (pantalla)
-        tabla.add(tituloLabel).padBottom(20).row();
-        tabla.add(userLabel).padBottom(40).row();
+        tabla.add(tituloLabel).padBottom(50).colspan(2).row();
+
         tabla.add(botonJugar).width(200).height(50).padBottom(15).row();
-        tabla.add(botonSincronizar).width(200).height(50).row();
+        tabla.add(botonConfiguracion).width(200).height(50).padBottom(15).row();
+        tabla.add(botonSincronizar).width(200).height(50).padBottom(15).row();
+        tabla.add(botonSalida).width(200).height(50).padBottom(15).row();
+        tabla.add(userLabel).padBottom(20).row();
+
 
         botonJugar.addListener(new ChangeListener() {
             @Override
@@ -66,6 +83,16 @@ public class MainMenuScreen implements Screen {
                 juego.setScreen(new GameScreen(juego));
             }
         });
+
+        botonConfiguracion.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeListener.ChangeEvent event, Actor actor) {
+                // Cambia la vista al tablero de juego
+                ConfigMenu config= new ConfigMenu("Configuracion",skin);
+                config.show(stage);
+            }
+        });
+
 
         // Asegúrate de importar com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
         // y com.badlogic.gdx.scenes.scene2d.Actor;
@@ -84,12 +111,20 @@ public class MainMenuScreen implements Screen {
                 }
             }
         });
+
+        botonSalida.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeListener.ChangeEvent event, Actor actor) {
+                // Cambia la vista al tablero de juego
+                Gdx.app.exit();
+            }
+        });
     }
 
     @Override
     public void render(float delta) {
         // Limpiamos la pantalla (Gris oscuro)
-        Gdx.gl.glClearColor(0.2f, 0.2f, 0.2f, 1);
+        Gdx.gl.glClearColor(0.15f, 0.15f, 0.2f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         // Dibujamos la UI

@@ -22,6 +22,7 @@ public class GameScreen implements Screen {
     OrthographicCamera camera;
     Viewport viewport;
     Vector3 touchPoint;
+    com.badlogic.gdx.graphics.g2d.BitmapFont font;
 
     public enum EstadoJuego {
         JUGANDO,
@@ -65,8 +66,9 @@ public class GameScreen implements Screen {
 
     @Override
     public void show() {
-        // Esto reemplaza a tu antiguo create()
         touchPoint = new Vector3();
+        font = new com.badlogic.gdx.graphics.g2d.BitmapFont();
+        font.getData().setScale(2f);
 
         texturaTablero = new Texture(Gdx.files.internal("tablero.png"));
         texturaTablero.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
@@ -89,7 +91,12 @@ public class GameScreen implements Screen {
     public void render(float delta) {
         if (estadoActual == EstadoJuego.JUGANDO) {
             handleInput();
+
+            // La velocidad base es 10f, pero aumenta ligeramente por cada fila que subas.
+            scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f);
+
             scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
+
         } else if (estadoActual == EstadoJuego.GAME_OVER) {
             if (Gdx.input.justTouched()) {
                 reiniciarJuego();
@@ -102,6 +109,7 @@ public class GameScreen implements Screen {
 
         juego.batch.begin();
 
+        // --- DIBUJADO DEL MUNDO (Tablero, sombras, enemigos, jugador) ---
         float scale = WORLD_WIDTH / texturaTablero.getWidth();
         float scaledHeight = texturaTablero.getHeight() * scale;
         float offsetY = scrollY % scaledHeight;
@@ -136,6 +144,24 @@ public class GameScreen implements Screen {
             float px = jugadorCol * CELL_W;
             float py = JUGADOR_FILA_VIS * CELL_H;
             juego.batch.draw(piezaRey, px, py, CELL_W, CELL_H);
+        }
+
+        // --- DIBUJADO DE LA INTERFAZ DE USUARIO (TEXTOS) ---
+        if (estadoActual == EstadoJuego.JUGANDO) {
+            // Puntuación en tiempo real en la esquina superior izquierda
+            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, WORLD_HEIGHT - 20);
+        } else if (estadoActual == EstadoJuego.GAME_OVER) {
+            // Pantalla de derrota, hay q modificarla
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
+
+            font.getData().setScale(2f);
+            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), WORLD_WIDTH / 2f - 70, WORLD_HEIGHT / 2f - 10);
+
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
+
+            font.getData().setScale(2f); // Restauramos la escala original para el próximo frame
         }
 
         juego.batch.end();
@@ -283,5 +309,6 @@ public class GameScreen implements Screen {
         SombraB.dispose();
         texturaPiezasNegras.dispose();
         texturaPiezasBlancas.dispose();
+        font.dispose();
     }
 }

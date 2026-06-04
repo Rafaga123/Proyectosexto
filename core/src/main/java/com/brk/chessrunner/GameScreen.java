@@ -1,23 +1,28 @@
 package com.brk.chessrunner;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.ObjectMap;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.brk.chessrunner.database.PartidaLocal;
 import com.brk.chessrunner.database.UsuarioLocal;
+import com.brk.chessrunner.ui.PauseWidget;
 
 import java.util.UUID;
 
 public class GameScreen implements Screen {
 
-    private final MainGame juego; // Referencia al gestor principal para usar su Batch y DB
+    private final MainGame juego;
 
     OrthographicCamera camera;
     Viewport viewport;
@@ -58,15 +63,26 @@ public class GameScreen implements Screen {
     float dragX = 0f;
     float dragY = 0f;
 
-    // El constructor recibe el juego principal
+    // --- VARIABLES DE INTERFAZ DE PAUSA ---
+
+    private com.badlogic.gdx.scenes.scene2d.ui.Table hudTable; // Cambiado a mayúscula para seguir el estándar
+    private com.badlogic.gdx.scenes.scene2d.ui.TextButton btnPausaHUD;
+    private Stage uiStage;
+    private Skin uiSkin;
+    private PauseWidget pauseWidget;
+
+    private boolean juegoPausado = false;
+
     public GameScreen(MainGame juego) {
         this.juego = juego;
     }
 
     @Override
     public void show() {
-        // Esto reemplaza a tu antiguo create()
         touchPoint = new Vector3();
+
+        //Esto seria para el regreso dentro de movil
+        Gdx.input.setCatchKey(Input.Keys.BACK, true);
 
         texturaTablero = new Texture(Gdx.files.internal("tablero.png"));
         texturaTablero.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
@@ -83,19 +99,89 @@ public class GameScreen implements Screen {
         camera = new OrthographicCamera();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
         camera.position.set(WORLD_WIDTH / 2f, WORLD_HEIGHT / 2f, 0);
+
+        // --- INICIALIZACIÓN DE LA UI DE PAUSA ---
+        uiStage = new Stage(new ScreenViewport());
+
+        try {
+            uiSkin = new Skin(Gdx.files.internal("ui/uiskin.json"));
+        } catch (Exception e) {
+            Gdx.app.error("UI", "Error cargando uiskin: " + e.getMessage());
+        }
+
+        // --- CREACIÓN DEL BOTÓN HUD DE PAUSA ---
+        hudTable = new com.badlogic.gdx.scenes.scene2d.ui.Table();
+        hudTable.setFillParent(true);
+
+        btnPausaHUD = new com.badlogic.gdx.scenes.scene2d.ui.TextButton("||", uiSkin);
+        btnPausaHUD.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override
+            public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                if (!juegoPausado && estadoActual == EstadoJuego.JUGANDO) {
+                    activarPausa();
+                }
+            }
+        });
+
+        // Posicionamos el botón arriba a la derecha
+        hudTable.top().right();
+        hudTable.add(btnPausaHUD).size(60f, 60f).padTop(15f).padRight(15f);
+
+        uiStage.addActor(hudTable);
+
+        // Instanciamos el widget de pausa con el callback para reanudar
+        pauseWidget = new PauseWidget(juego, uiSkin, uiStage, new PauseWidget.IPauseListener() {
+            @Override
+            public void onResume() {
+                quitarPausa();
+            }
+        });
+
+        // Hacemos que la interfaz procese los toques (para poder presionar el botón)
+        Gdx.input.setInputProcessor(uiStage);
+    }
+
+    // --- MÉTODOS DE CONTROL DE PAUSA ---
+    private void activarPausa() {
+        juegoPausado = true;
+        hudTable.setVisible(false); // Ocultamos el botón ||
+        uiStage.addActor(pauseWidget); // Añade el menú a la pantalla
+        Gdx.input.setInputProcessor(uiStage); // Asegura prioridad de clics
+    }
+
+    private void quitarPausa() {
+        juegoPausado = false;
+        pauseWidget.remove(); // Quita el menú de la pantalla
+        hudTable.setVisible(true); // Vuelve a mostrar el botón ||
+        Gdx.input.setInputProcessor(uiStage); // Mantenemos el stage escuchando para el botón HUD
     }
 
     @Override
     public void render(float delta) {
-        if (estadoActual == EstadoJuego.JUGANDO) {
-            handleInput();
-            scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
-        } else if (estadoActual == EstadoJuego.GAME_OVER) {
-            if (Gdx.input.justTouched()) {
-                reiniciarJuego();
+        // Deteccion de salida, para ESC en PC y Atras de Android
+        if ((Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK))
+            && estadoActual == EstadoJuego.JUGANDO) {
+
+            if (!juegoPausado) {
+                activarPausa();
+            } else {
+                quitarPausa();
             }
         }
 
+        // --- Logica del juego para la pausa ---
+        if (!juegoPausado) {
+            if (estadoActual == EstadoJuego.JUGANDO) {
+                handleInput();
+                scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
+            } else if (estadoActual == EstadoJuego.GAME_OVER) {
+                if (Gdx.input.justTouched()) {
+                    reiniciarJuego();
+                }
+            }
+        }
+
+        // ---  Dibujado del fondo ---
         camera.update();
         juego.batch.setProjectionMatrix(camera.combined);
         ScreenUtils.clear(0f, 0f, 0f, 1f);
@@ -139,6 +225,11 @@ public class GameScreen implements Screen {
         }
 
         juego.batch.end();
+
+        // --- 4. DIBUJADO DE LAS INTERFACES DE UI ---
+        // Siempre se dibuja para mostrar el HUD en juego y el menú cuando se pausa
+        uiStage.act(delta);
+        uiStage.draw();
     }
 
     private void handleInput() {
@@ -195,17 +286,19 @@ public class GameScreen implements Screen {
                         estadoActual = EstadoJuego.GAME_OVER;
 
                         // Obtenemos el usuario y guardamos usando el db del gestor "juego"
-                        UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
+                        if (juego.db != null) {
+                            UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
 
-                        if (jugadorActual != null) {
-                            String idPartida = UUID.randomUUID().toString();
-                            int puntuacion = filaMaximaAlcanzada * 10;
-                            int tiempo = 0;
+                            if (jugadorActual != null) {
+                                String idPartida = UUID.randomUUID().toString();
+                                int puntuacion = filaMaximaAlcanzada * 10;
+                                int tiempo = 0;
 
-                            PartidaLocal nuevaPartida = new PartidaLocal(idPartida, jugadorActual.getId(), puntuacion, tiempo, false);
-                            juego.db.guardarPartida(nuevaPartida);
-                        } else {
-                            System.err.println("No se pudo guardar: No hay usuario activo.");
+                                PartidaLocal nuevaPartida = new PartidaLocal(idPartida, jugadorActual.getId(), puntuacion, tiempo, false);
+                                juego.db.guardarPartida(nuevaPartida);
+                            } else {
+                                System.err.println("No se pudo guardar: No hay usuario activo.");
+                            }
                         }
                     } else {
                         System.out.println("Avanzaste a una zona segura.");
@@ -225,6 +318,9 @@ public class GameScreen implements Screen {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height);
+        if (uiStage != null) {
+            uiStage.getViewport().update(width, height, true);
+        }
     }
 
     public int getFilaLogica() {
@@ -267,7 +363,11 @@ public class GameScreen implements Screen {
     }
 
     @Override
-    public void pause() { }
+    public void pause() {
+        if (estadoActual == EstadoJuego.JUGANDO && !juegoPausado) {
+            activarPausa();
+        }
+    }
 
     @Override
     public void resume() { }
@@ -277,11 +377,13 @@ public class GameScreen implements Screen {
 
     @Override
     public void dispose() {
-        // No cerramos el batch aquí, porque le pertenece a MainGame
         texturaTablero.dispose();
         SombraA.dispose();
         SombraB.dispose();
         texturaPiezasNegras.dispose();
         texturaPiezasBlancas.dispose();
+
+        if (uiStage != null) uiStage.dispose();
+        if (uiSkin != null) uiSkin.dispose();
     }
 }

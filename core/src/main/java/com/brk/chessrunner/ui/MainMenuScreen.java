@@ -20,13 +20,13 @@ import org.w3c.dom.Text;
 
 public class MainMenuScreen implements Screen {
 
-    private final MainGame juego;
+    private final MainGame game;
     private final LocalDatabase db;
     private Stage stage;
     private Skin skin;
 
-    public MainMenuScreen(MainGame juego, LocalDatabase db) {
-        this.juego = juego;
+    public MainMenuScreen(MainGame game, LocalDatabase db) {
+        this.game = game;
         this.db = db;
     }
 
@@ -78,9 +78,9 @@ public class MainMenuScreen implements Screen {
 
         botonJugar.addListener(new ChangeListener() {
             @Override
-            public void changed(ChangeListener.ChangeEvent event, Actor actor) {
+            public void changed(ChangeEvent event, Actor actor) {
                 // Cambia la vista al tablero de juego
-                juego.setScreen(new GameScreen(juego));
+                game.setScreen(new GameScreen(game));
             }
         });
 
@@ -102,7 +102,7 @@ public class MainMenuScreen implements Screen {
             public void changed(ChangeEvent event, Actor actor) {
                 // Si el ID empieza con "guest", no está logueado en la nube
                 if (usuario != null && usuario.getId().startsWith("guest")) {
-                    LoginDialog dialog = new LoginDialog("Iniciar Sesion", skin, db, juego);
+                    LoginDialog dialog = new LoginDialog("Iniciar Sesion", skin, db, game);
                     dialog.show(stage);
                 } else {
                     // Si ya es un usuario real, abrimos el SyncDialog

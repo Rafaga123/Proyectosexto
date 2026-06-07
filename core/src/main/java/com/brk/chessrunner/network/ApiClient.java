@@ -17,6 +17,29 @@ public class ApiClient {
     }
 
     /**
+     * Traduce códigos de estado HTTP a mensajes amigables para el usuario.
+     */
+    private static String traducirError(int statusCode, String rawBody) {
+        // Si el cuerpo tiene texto (y no es un JSON gigante), a menudo es el mensaje de error del Result Pattern
+        if (rawBody != null && rawBody.length() > 0 && rawBody.length() < 100 && !rawBody.contains("{")) {
+            return rawBody;
+        }
+
+        switch (statusCode) {
+            case 401:
+                return "Credenciales incorrectas. Verifica tu correo y contraseña.";
+            case 403:
+                return "Acceso denegado. Tu cuenta podría estar inactiva o baneada.";
+            case 404:
+                return "El servidor no responde. Verifica la configuración de la IP.";
+            case 500:
+                return "Error interno del servidor. Reintenta en unos momentos.";
+            default:
+                return "Error inesperado (" + statusCode + "). Revisa tu conexión.";
+        }
+    }
+
+    /**
      * Petición para iniciar sesión en Spring Boot
      */
     public static void login(String correo, String password, ApiCallback callback) {
@@ -40,19 +63,19 @@ public class ApiClient {
                 int statusCode = httpResponse.getStatus().getStatusCode();
                 String resultAsString = httpResponse.getResultAsString();
 
-                if (statusCode == 200 || statusCode == 201) {
+                if (statusCode >= 200 && statusCode < 300) {
                     // Si el servidor responde OK, parseamos el JSON de respuesta
                     JsonReader jsonReader = new JsonReader();
                     JsonValue json = jsonReader.parse(resultAsString);
                     callback.onExito(json);
                 } else {
-                    callback.onError("Error del servidor. Código: " + statusCode + " - " + resultAsString);
+                    callback.onError(traducirError(statusCode, resultAsString));
                 }
             }
 
             @Override
             public void failed(Throwable t) {
-                callback.onError("Fallo de conexión. ¿Está encendida la API? Detalles: " + t.getMessage());
+                callback.onError("No se pudo conectar con el servidor. ¿Está encendida la API?");
             }
 
             @Override
@@ -80,11 +103,10 @@ public class ApiClient {
             jsonBody.append("{")
                 .append("\"id\":\"").append(p.getId()).append("\",")
                 .append("\"puntuacion\":").append(p.getPuntuacion()).append(",")
-                // Tu API quizás requiera estos campos extras, los mandamos en 0 o vacíos por ahora
-                .append("\"nivelAlcanzado\":0,")
-                .append("\"piezaMortal\":\"\",")
+                .append("\"nivelAlcanzado\":").append(p.getNivelAlcanzado()).append(",")
+                .append("\"piezaMortal\":\"").append(p.getPiezaMortal()).append("\",")
                 .append("\"tiempoSobrevivido\":").append(p.getTiempoSobrevivido()).append(",")
-                .append("\"fechaPartida\":\"").append(java.time.LocalDateTime.now().toString()).append("\"")
+                .append("\"fechaPartida\":\"").append(p.getFechaPartida()).append("\"")
                 .append("}");
             if (i < partidas.size() - 1) jsonBody.append(",");
         }
@@ -102,11 +124,13 @@ public class ApiClient {
             @Override
             public void handleHttpResponse(Net.HttpResponse httpResponse) {
                 int statusCode = httpResponse.getStatus().getStatusCode();
+                String resultAsString = httpResponse.getResultAsString();
+
                 if (statusCode >= 200 && statusCode < 300) {
                     // Retornamos un JSON vacío o de éxito, ya que lo importante es el status 200 OK
                     callback.onExito(new JsonReader().parse("{\"status\":\"success\"}"));
                 } else {
-                    callback.onError("Error de sincronización. Código: " + statusCode);
+                    callback.onError(traducirError(statusCode, resultAsString));
                 }
             }
             @Override

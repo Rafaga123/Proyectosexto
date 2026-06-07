@@ -75,6 +75,9 @@ public class MainMenuScreen implements Screen {
         tabla.add(botonSalida).width(200).height(50).padBottom(15).row();
         tabla.add(userLabel).padBottom(20).row();
 
+        // --- SINCRONIZACIÓN AUTOMÁTICA AL ENTRAR ---
+        com.brk.chessrunner.network.SyncManager.syncSilently(db, stage, skin);
+
 
         botonJugar.addListener(new ChangeListener() {
             @Override

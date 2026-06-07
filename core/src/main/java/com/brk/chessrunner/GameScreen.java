@@ -72,6 +72,7 @@ public class GameScreen implements Screen {
     private PauseWidget pauseWidget;
 
     private boolean juegoPausado = false;
+    private float tiempoJugado = 0f;
 
     public GameScreen(MainGame juego) {
         this.juego = juego;
@@ -174,6 +175,7 @@ public class GameScreen implements Screen {
             if (estadoActual == EstadoJuego.JUGANDO) {
                 handleInput();
                 scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
+                tiempoJugado += delta;
             } else if (estadoActual == EstadoJuego.GAME_OVER) {
                 if (Gdx.input.justTouched()) {
                     reiniciarJuego();
@@ -285,6 +287,15 @@ public class GameScreen implements Screen {
                         System.out.println("¡JAQUE MATE! Game Over.");
                         estadoActual = EstadoJuego.GAME_OVER;
 
+                        // Identificamos quién nos mató
+                        String piezaAsesina = "Desconocida";
+                        for (Enemigo e : gestorEnemigos.activos) {
+                            if (e.atacaCasilla(jugadorCol, filaLogicaJugador)) {
+                                piezaAsesina = e.tipo.name();
+                                break;
+                            }
+                        }
+
                         // Obtenemos el usuario y guardamos usando el db del gestor "juego"
                         if (juego.db != null) {
                             UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
@@ -292,10 +303,22 @@ public class GameScreen implements Screen {
                             if (jugadorActual != null) {
                                 String idPartida = UUID.randomUUID().toString();
                                 int puntuacion = filaMaximaAlcanzada * 10;
-                                int tiempo = 0;
+                                String fechaIso = java.time.LocalDateTime.now().toString();
 
-                                PartidaLocal nuevaPartida = new PartidaLocal(idPartida, jugadorActual.getId(), puntuacion, tiempo, false);
+                                PartidaLocal nuevaPartida = new PartidaLocal(
+                                    idPartida, 
+                                    jugadorActual.getId(), 
+                                    puntuacion, 
+                                    filaMaximaAlcanzada, 
+                                    piezaAsesina, 
+                                    (int) tiempoJugado, 
+                                    fechaIso, 
+                                    false
+                                );
                                 juego.db.guardarPartida(nuevaPartida);
+
+                                // --- SINCRONIZACIÓN AUTOMÁTICA AL MORIR ---
+                                com.brk.chessrunner.network.SyncManager.syncSilently(juego.db, uiStage, uiSkin);
                             } else {
                                 System.err.println("No se pudo guardar: No hay usuario activo.");
                             }
@@ -333,6 +356,7 @@ public class GameScreen implements Screen {
         filaLogicaJugador = 0;
         filaMaximaAlcanzada = 0;
         jugadorCol = 2;
+        tiempoJugado = 0f;
 
         gestorEnemigos.activos.clear();
         estadoActual = EstadoJuego.JUGANDO;

@@ -26,7 +26,8 @@ public class GameScreen implements Screen {
 
     public enum EstadoJuego {
         JUGANDO,
-        GAME_OVER
+        GAME_OVER,
+        VICTORIA
     }
     EstadoJuego estadoActual = EstadoJuego.JUGANDO;
 
@@ -39,6 +40,9 @@ public class GameScreen implements Screen {
     float scrollSpeed = 10f;
     int filaLogicaJugador = 0;
     GestorEnemigos gestorEnemigos;
+    public ModoJuego modoActual;
+    public int nivelActual;
+    public int filaMeta = -2; // -2 = Infinito (No hay meta)
 
     TextureRegion piezaRey;
     int configColorEnemigo = 1;
@@ -60,8 +64,17 @@ public class GameScreen implements Screen {
     float dragY = 0f;
 
     // El constructor recibe el juego principal
-    public GameScreen(MainGame juego) {
+    public GameScreen(MainGame juego, ModoJuego modo, int nivel) {
         this.juego = juego;
+        this.modoActual = modo;
+        this.nivelActual = nivel;
+
+        // Configurar la meta si es tutorial
+        if (modo == ModoJuego.TUTORIAL) {
+            if (nivel == 1) filaMeta = 15;
+            else if (nivel == 2) filaMeta = 25;
+            else if (nivel == 3) filaMeta = 40;
+        }
     }
 
     @Override
@@ -100,6 +113,11 @@ public class GameScreen implements Screen {
         } else if (estadoActual == EstadoJuego.GAME_OVER) {
             if (Gdx.input.justTouched()) {
                 reiniciarJuego();
+            }
+        } else if (estadoActual == EstadoJuego.VICTORIA) {
+            // Si ganamos, al tocar la pantalla volvemos al menú principal
+            if (Gdx.input.justTouched()) {
+                juego.setScreen(new com.brk.chessrunner.ui.MainMenuScreen(juego, juego.db));
             }
         }
 
@@ -162,6 +180,17 @@ public class GameScreen implements Screen {
             font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
 
             font.getData().setScale(2f); // Restauramos la escala original para el próximo frame
+        } else if (estadoActual == EstadoJuego.VICTORIA) {
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "¡VICTORIA!", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
+
+            font.getData().setScale(1.5f);
+            font.draw(juego.batch, "Tutorial completado", WORLD_WIDTH / 2f - 100, WORLD_HEIGHT / 2f - 10);
+
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para continuar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
+
+            font.getData().setScale(2f);
         }
 
         juego.batch.end();
@@ -238,11 +267,17 @@ public class GameScreen implements Screen {
                     }
 
                     if (diffRow > 0) {
-                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol);
+                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
                     }
 
                     int filaBase = (int) (scrollY / CELL_H);
                     gestorEnemigos.limpiarEnemigosPasados(filaBase);
+
+                    // Condicion de victoria, que solo se vera en el tutorial
+                    if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) {
+                        System.out.println("¡TUTORIAL " + nivelActual + " COMPLETADO!");
+                        estadoActual = EstadoJuego.VICTORIA;
+                    }
                 }
             }
         }

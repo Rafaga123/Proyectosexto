@@ -9,8 +9,14 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 
 public class ConfigGame extends Dialog {
 
+    private final com.badlogic.gdx.Preferences prefs;
+    private final Slider musicSlider;
+    private final Slider fxSlider;
+
     public ConfigGame(String title, Skin skin) {
         super(title, skin);
+
+        prefs = com.badlogic.gdx.Gdx.app.getPreferences("ChessRunnerSettings");
 
         // Configuraciones básicas del cuadro de diálogo
         setMovable(false);
@@ -21,13 +27,13 @@ public class ConfigGame extends Dialog {
 
         // Control de Audio (Música)
         Label musicLabel = new Label("Volumen Musica:", skin);
-        Slider musicSlider = new Slider(0, 1, 0.1f, false, skin);
-        musicSlider.setValue(0.8f); // Valor por defecto o cargado de las preferencias
+        musicSlider = new Slider(0, 1, 0.1f, false, skin);
+        musicSlider.setValue(prefs.getFloat("musicVolume", 0.8f));
 
         // Efectos de Sonido
         Label fxLabel = new Label("Efectos de Sonido:", skin);
-        Slider fxSlider = new Slider(0, 1, 0.1f, false, skin);
-        fxSlider.setValue(0.5f);
+        fxSlider = new Slider(0, 1, 0.1f, false, skin);
+        fxSlider.setValue(prefs.getFloat("fxVolume", 0.5f));
 
 
         // Añadimos los elementos a la tabla interna del diálogo organizados por filas
@@ -47,8 +53,11 @@ public class ConfigGame extends Dialog {
     protected void result(Object object) {
         // Esta lógica se ejecuta automáticamente cuando se presiona el botón del diálogo
         if (object instanceof Boolean && (Boolean) object) {
-            System.out.println("Configuraciones guardadas localmente.");
-            // Aquí puedes aplicar los cambios de volumen o guardarlos en Gdx.app.getPreferences()
+            prefs.putFloat("musicVolume", musicSlider.getValue());
+            prefs.putFloat("fxVolume", fxSlider.getValue());
+            prefs.flush();
+
+            System.out.println("Configuraciones de juego guardadas.");
             hide();
         }
     }

@@ -34,7 +34,10 @@ public class DesktopDatabaseManager implements LocalDatabase {
                     "id TEXT PRIMARY KEY, " +
                     "usuario_id TEXT NOT NULL, " +
                     "puntuacion INTEGER DEFAULT 0, " +
+                    "nivel_alcanzado INTEGER DEFAULT 0, " +
+                    "pieza_mortal TEXT, " +
                     "tiempo_sobrevivido INTEGER DEFAULT 0, " +
+                    "fecha_partida TEXT, " +
                     "sincronizado INTEGER DEFAULT 0, " +
                     "FOREIGN KEY (usuario_id) REFERENCES usuario_local(id)" +
                     ");";
@@ -94,14 +97,17 @@ public class DesktopDatabaseManager implements LocalDatabase {
     @Override
     public void guardarPartida(PartidaLocal partida) {
         // Usamos PreparedStatement para evitar inyecciones SQL y formatear fácil
-        String sql = "INSERT INTO partida_local (id, usuario_id, puntuacion, tiempo_sobrevivido, sincronizado) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO partida_local (id, usuario_id, puntuacion, nivel_alcanzado, pieza_mortal, tiempo_sobrevivido, fecha_partida, sincronizado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (java.sql.PreparedStatement pstmt = conexion.prepareStatement(sql)) {
             pstmt.setString(1, partida.getId());
             pstmt.setString(2, partida.getUsuarioId());
             pstmt.setInt(3, partida.getPuntuacion());
-            pstmt.setInt(4, partida.getTiempoSobrevivido());
-            pstmt.setInt(5, partida.isSincronizado() ? 1 : 0); // SQLite no tiene booleanos puros, usamos 1 y 0
+            pstmt.setInt(4, partida.getNivelAlcanzado());
+            pstmt.setString(5, partida.getPiezaMortal());
+            pstmt.setInt(6, partida.getTiempoSobrevivido());
+            pstmt.setString(7, partida.getFechaPartida());
+            pstmt.setInt(8, partida.isSincronizado() ? 1 : 0); // SQLite no tiene booleanos puros, usamos 1 y 0
 
             pstmt.executeUpdate();
             System.out.println("¡Partida guardada en SQLite exitosamente! ID: " + partida.getId());
@@ -160,7 +166,10 @@ public class DesktopDatabaseManager implements LocalDatabase {
                         rs.getString("id"),
                         rs.getString("usuario_id"),
                         rs.getInt("puntuacion"),
+                        rs.getInt("nivel_alcanzado"),
+                        rs.getString("pieza_mortal"),
                         rs.getInt("tiempo_sobrevivido"),
+                        rs.getString("fecha_partida"),
                         false
                     ));
                 }

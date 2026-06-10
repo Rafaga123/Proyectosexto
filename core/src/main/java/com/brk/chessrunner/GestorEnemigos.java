@@ -63,6 +63,7 @@ public class GestorEnemigos {
             }
         }
     }
+
     // Algoritmo de Búsqueda en Anchura (BFS) para garantizar que el nivel es pasable
     private boolean existeCaminoSeguro(int colInicio, int filaInicio, int filaMeta) {
         // Calculo de cuántas filas hay de diferencia para dimensionar nuestro mapa de visitados
@@ -119,9 +120,7 @@ public class GestorEnemigos {
     }
 
     // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
-    public void intentarGenerarEnemigos(int filaJugador, int colJugador) {
-        // LÍMITE DE POBLACIÓN: Si hay 10 o más enemigos en pantalla, no generamos más.
-        // Esto evita la saturación extrema del 100% que veías en la imagen.
+    public void intentarGenerarEnemigos(int filaJugador, int colJugador, ModoJuego modo, int nivel) {
         if (activos.size >= 10) {
             return;
         }
@@ -136,8 +135,8 @@ public class GestorEnemigos {
             if (MathUtils.randomBoolean(0.5f)) {
                 int colAleatoria = MathUtils.random(0, 4);
 
-                // Usamos nuestro nuevo sistema de pesos en lugar del arreglo plano
-                TipoPieza tipoElegido = obtenerPiezaAleatoria();
+                // Pasamos el modo y nivel al sistema de pesos
+                TipoPieza tipoElegido = obtenerPiezaAleatoria(modo, nivel);
 
                 if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
                     Enemigo nuevoEnemigo = new Enemigo(tipoElegido, colAleatoria, filaAparicion);
@@ -165,22 +164,28 @@ public class GestorEnemigos {
     }
 
     // Sistema de pesos para balancear la aparición de piezas
-    private TipoPieza obtenerPiezaAleatoria() {
+    private TipoPieza obtenerPiezaAleatoria(ModoJuego modo, int nivel) {
+        if (modo == ModoJuego.TUTORIAL) {
+            if (nivel == 1) {
+                return TipoPieza.PEON; // Nivel 1: solo se crearan peones
+            } else if (nivel == 2) {
+                // Nivel 2: Peones a un 70% y Caballos 30%
+                return MathUtils.randomBoolean(0.7f) ? TipoPieza.PEON : TipoPieza.CABALLO;
+            } else if (nivel == 3) {
+                // Nivel 3: Peones (50%), Caballos (30%), Alfiles (20%)
+                int tirada = MathUtils.random(1, 100);
+                if (tirada <= 50) return TipoPieza.PEON;
+                if (tirada <= 80) return TipoPieza.CABALLO;
+                return TipoPieza.ALFIL;
+            }
+        }
+
+        // Para el modo Infinito o Contrarreloj, vamos a usar la distribución normal (o sea todo normalito)
         int tirada = MathUtils.random(1, 100);
-
-        // 45% de probabilidad de ser un Peón
         if (tirada <= 45) return TipoPieza.PEON;
-
-        // 25% de probabilidad de ser un Caballo
         if (tirada <= 70) return TipoPieza.CABALLO;
-
-        // 15% de probabilidad de ser un Alfil
         if (tirada <= 85) return TipoPieza.ALFIL;
-
-        // 10% de probabilidad de ser una Torre
         if (tirada <= 95) return TipoPieza.TORRE;
-
-        // Solo 5% de probabilidad de ser una Reina
         return TipoPieza.REINA;
     }
 }

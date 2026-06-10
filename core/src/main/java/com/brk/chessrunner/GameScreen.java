@@ -27,10 +27,12 @@ public class GameScreen implements Screen {
     OrthographicCamera camera;
     Viewport viewport;
     Vector3 touchPoint;
+    com.badlogic.gdx.graphics.g2d.BitmapFont font;
 
     public enum EstadoJuego {
         JUGANDO,
-        GAME_OVER
+        GAME_OVER,
+        VICTORIA
     }
     EstadoJuego estadoActual = EstadoJuego.JUGANDO;
 
@@ -43,6 +45,9 @@ public class GameScreen implements Screen {
     float scrollSpeed = 10f;
     int filaLogicaJugador = 0;
     GestorEnemigos gestorEnemigos;
+    public ModoJuego modoActual;
+    public int nivelActual;
+    public int filaMeta = -2; // -2 = Infinito (No hay meta)
 
     TextureRegion piezaRey;
     int configColorEnemigo = 1;
@@ -74,12 +79,26 @@ public class GameScreen implements Screen {
     private boolean juegoPausado = false;
 
     public GameScreen(MainGame juego) {
+    // El constructor recibe el juego principal
+    public GameScreen(MainGame juego, ModoJuego modo, int nivel) {
         this.juego = juego;
+        this.modoActual = modo;
+        this.nivelActual = nivel;
+
+        // Configurar la meta si es tutorial
+        if (modo == ModoJuego.TUTORIAL) {
+            if (nivel == 1) filaMeta = 15;
+            else if (nivel == 2) filaMeta = 25;
+            else if (nivel == 3) filaMeta = 40;
+        }
     }
+}
 
     @Override
     public void show() {
         touchPoint = new Vector3();
+        font = new com.badlogic.gdx.graphics.g2d.BitmapFont();
+        font.getData().setScale(2f);
 
         //Esto seria para el regreso dentro de movil
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
@@ -166,6 +185,22 @@ public class GameScreen implements Screen {
                 activarPausa();
             } else {
                 quitarPausa();
+        if (estadoActual == EstadoJuego.JUGANDO) {
+            handleInput();
+
+            // La velocidad base es 10f, pero aumenta ligeramente por cada fila que subas.
+            scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f);
+
+            scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
+
+        } else if (estadoActual == EstadoJuego.GAME_OVER) {
+            if (Gdx.input.justTouched()) {
+                reiniciarJuego();
+            }
+        } else if (estadoActual == EstadoJuego.VICTORIA) {
+            // Si ganamos, al tocar la pantalla volvemos al menú principal
+            if (Gdx.input.justTouched()) {
+                juego.setScreen(new com.brk.chessrunner.ui.MainMenuScreen(juego, juego.db));
             }
         }
 
@@ -180,7 +215,9 @@ public class GameScreen implements Screen {
                 }
             }
         }
+            }
 
+        }
         // ---  Dibujado del fondo ---
         camera.update();
         juego.batch.setProjectionMatrix(camera.combined);
@@ -188,6 +225,7 @@ public class GameScreen implements Screen {
 
         juego.batch.begin();
 
+        // --- DIBUJADO DEL MUNDO (Tablero, sombras, enemigos, jugador) ---
         float scale = WORLD_WIDTH / texturaTablero.getWidth();
         float scaledHeight = texturaTablero.getHeight() * scale;
         float offsetY = scrollY % scaledHeight;
@@ -222,6 +260,35 @@ public class GameScreen implements Screen {
             float px = jugadorCol * CELL_W;
             float py = JUGADOR_FILA_VIS * CELL_H;
             juego.batch.draw(piezaRey, px, py, CELL_W, CELL_H);
+        }
+
+        // --- DIBUJADO DE LA INTERFAZ DE USUARIO (TEXTOS) ---
+        if (estadoActual == EstadoJuego.JUGANDO) {
+            // Puntuación en tiempo real en la esquina superior izquierda
+            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, WORLD_HEIGHT - 20);
+        } else if (estadoActual == EstadoJuego.GAME_OVER) {
+            // Pantalla de derrota, hay q modificarla
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
+
+            font.getData().setScale(2f);
+            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), WORLD_WIDTH / 2f - 70, WORLD_HEIGHT / 2f - 10);
+
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
+
+            font.getData().setScale(2f); // Restauramos la escala original para el próximo frame
+        } else if (estadoActual == EstadoJuego.VICTORIA) {
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "¡VICTORIA!", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
+
+            font.getData().setScale(1.5f);
+            font.draw(juego.batch, "Tutorial completado", WORLD_WIDTH / 2f - 100, WORLD_HEIGHT / 2f - 10);
+
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para continuar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
+
+            font.getData().setScale(2f);
         }
 
         juego.batch.end();
@@ -305,11 +372,17 @@ public class GameScreen implements Screen {
                     }
 
                     if (diffRow > 0) {
-                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol);
+                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
                     }
 
                     int filaBase = (int) (scrollY / CELL_H);
                     gestorEnemigos.limpiarEnemigosPasados(filaBase);
+
+                    // Condicion de victoria, que solo se vera en el tutorial
+                    if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) {
+                        System.out.println("¡TUTORIAL " + nivelActual + " COMPLETADO!");
+                        estadoActual = EstadoJuego.VICTORIA;
+                    }
                 }
             }
         }
@@ -385,5 +458,6 @@ public class GameScreen implements Screen {
 
         if (uiStage != null) uiStage.dispose();
         if (uiSkin != null) uiSkin.dispose();
+        font.dispose();
     }
 }

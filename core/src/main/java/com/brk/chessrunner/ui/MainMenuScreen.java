@@ -13,6 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.brk.chessrunner.GameScreen;
 import com.brk.chessrunner.MainGame;
+import com.brk.chessrunner.ModoJuego;
 import com.brk.chessrunner.database.LocalDatabase;
 import com.brk.chessrunner.database.UsuarioLocal;
 
@@ -80,7 +81,7 @@ public class MainMenuScreen implements Screen {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 // Cambia la vista al tablero de juego
-                game.setScreen(new GameScreen(game));
+                juego.setScreen(new GameScreen(juego, ModoJuego.INFINITO, 0)); // Esto hay que cambiarlo segun sea el modo
             }
         });
 

@@ -43,6 +43,8 @@ public class GameScreen implements Screen {
     public ModoJuego modoActual;
     public int nivelActual;
     public int filaMeta = -2; // -2 = Infinito (No hay meta)
+    public float tiempoRestante;
+    public String mensajeGameOver = "";
 
     TextureRegion piezaRey;
     int configColorEnemigo = 1;
@@ -74,6 +76,8 @@ public class GameScreen implements Screen {
             if (nivel == 1) filaMeta = 15;
             else if (nivel == 2) filaMeta = 25;
             else if (nivel == 3) filaMeta = 40;
+        }  else if (modo == ModoJuego.CONTRARRELOJ) {
+        tiempoRestante = 60f; // Hay que ajustar para balancear
         }
     }
 
@@ -104,6 +108,15 @@ public class GameScreen implements Screen {
     public void render(float delta) {
         if (estadoActual == EstadoJuego.JUGANDO) {
             handleInput();
+
+            // Contrarelloj logica
+            if (modoActual == ModoJuego.CONTRARRELOJ) {
+                tiempoRestante -= delta; // Restamos los milisegundos que van pasando
+                if (tiempoRestante <= 0) {
+                    tiempoRestante = 0;
+                    dispararGameOver("¡TIEMPO AGOTADO!"); // Muelto
+                }
+            }
 
             // La velocidad base es 10f, pero aumenta ligeramente por cada fila que subas.
             scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f);
@@ -166,20 +179,31 @@ public class GameScreen implements Screen {
 
         // --- DIBUJADO DE LA INTERFAZ DE USUARIO (TEXTOS) ---
         if (estadoActual == EstadoJuego.JUGANDO) {
-            // Puntuación en tiempo real en la esquina superior izquierda
-            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, WORLD_HEIGHT - 20);
+            if (modoActual == ModoJuego.TUTORIAL) {
+                font.draw(juego.batch, "Tutorial " + nivelActual + " - Meta: " + filaMeta, 20, WORLD_HEIGHT - 20);
+            } else {
+                font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, WORLD_HEIGHT - 20);
+
+                // HUD Exclusivo de Contrarreloj
+                if (modoActual == ModoJuego.CONTRARRELOJ) {
+                    font.draw(juego.batch, "Tiempo: " + (int)tiempoRestante + "s", 20, WORLD_HEIGHT - 60);
+                }
+            }
         } else if (estadoActual == EstadoJuego.GAME_OVER) {
-            // Pantalla de derrota, hay q modificarla
             font.getData().setScale(3f);
-            font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
+            font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 80);
+
+            // Mostramos si fue Jaque Mate o Tiempo Agotado
+            font.getData().setScale(1.5f);
+            font.draw(juego.batch, mensajeGameOver, WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f + 30);
 
             font.getData().setScale(2f);
-            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), WORLD_WIDTH / 2f - 70, WORLD_HEIGHT / 2f - 10);
+            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), WORLD_WIDTH / 2f - 70, WORLD_HEIGHT / 2f - 20);
 
             font.getData().setScale(1.2f);
-            font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
+            font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 70);
 
-            font.getData().setScale(2f); // Restauramos la escala original para el próximo frame
+            font.getData().setScale(2f);
         } else if (estadoActual == EstadoJuego.VICTORIA) {
             font.getData().setScale(3f);
             font.draw(juego.batch, "¡VICTORIA!", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
@@ -246,28 +270,11 @@ public class GameScreen implements Screen {
                     gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
 
                     if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
-                        System.out.println("¡JAQUE MATE! Game Over.");
-                        estadoActual = EstadoJuego.GAME_OVER;
-
-                        // Obtenemos el usuario y guardamos usando el db del gestor "juego"
-                        UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
-
-                        if (jugadorActual != null) {
-                            String idPartida = UUID.randomUUID().toString();
-                            int puntuacion = filaMaximaAlcanzada * 10;
-                            int tiempo = 0;
-
-                            PartidaLocal nuevaPartida = new PartidaLocal(idPartida, jugadorActual.getId(), puntuacion, tiempo, false);
-                            juego.db.guardarPartida(nuevaPartida);
-                        } else {
-                            System.err.println("No se pudo guardar: No hay usuario activo.");
-                        }
+                        dispararGameOver("¡JAQUE MATE!");
                     } else {
-                        System.out.println("Avanzaste a una zona segura.");
-                    }
-
-                    if (diffRow > 0) {
-                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
+                        if (diffRow > 0) {
+                            gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
+                        }
                     }
 
                     int filaBase = (int) (scrollY / CELL_H);
@@ -288,9 +295,9 @@ public class GameScreen implements Screen {
         viewport.update(width, height);
     }
 
-    public int getFilaLogica() {
-        return (int)(scrollY / CELL_H) + JUGADOR_FILA_VIS;
-    }
+//    public int getFilaLogica() {
+//        return (int)(scrollY / CELL_H) + JUGADOR_FILA_VIS;
+//    }
 
     private void reiniciarJuego() {
         scrollY = 0f;
@@ -299,8 +306,33 @@ public class GameScreen implements Screen {
         filaMaximaAlcanzada = 0;
         jugadorCol = 2;
 
+        if (modoActual == ModoJuego.CONTRARRELOJ) {
+            tiempoRestante = 60f;
+        }
+
         gestorEnemigos.activos.clear();
         estadoActual = EstadoJuego.JUGANDO;
+    }
+
+    private void dispararGameOver(String razon) {
+        System.out.println(razon + " Game Over.");
+        mensajeGameOver = razon;
+        estadoActual = EstadoJuego.GAME_OVER;
+
+        // Obtenemos el usuario y guardamos en BD local
+        com.brk.chessrunner.database.UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
+
+        if (jugadorActual != null) {
+            String idPartida = java.util.UUID.randomUUID().toString();
+            int puntuacion = filaMaximaAlcanzada * 10;
+            // Calculamos el tiempo sobrevivido
+            int tiempoSobrevivido = (modoActual == ModoJuego.CONTRARRELOJ) ? (int)(60f - tiempoRestante) : 0;
+
+            com.brk.chessrunner.database.PartidaLocal nuevaPartida = new com.brk.chessrunner.database.PartidaLocal(idPartida, jugadorActual.getId(), puntuacion, tiempoSobrevivido, false);
+            juego.db.guardarPartida(nuevaPartida);
+        } else {
+            System.err.println("No se pudo guardar: No hay usuario activo.");
+        }
     }
 
     public void asignarSetDePiezas(int color) {
@@ -322,7 +354,7 @@ public class GameScreen implements Screen {
         piezaRey = matrizJugador[0][0];
     }
 
-    public void alternarColorEnemigo() {
+    public void alternarColorEnemigo() { // Sigue sin uso hasta crear la configuracion - igual que los tableros
         configColorEnemigo = (configColorEnemigo == 1) ? 2 : 1;
         asignarSetDePiezas(configColorEnemigo);
     }

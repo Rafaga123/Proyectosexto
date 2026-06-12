@@ -80,23 +80,23 @@ public class GameScreen implements Screen {
 
     private boolean juegoPausado = false;
 
-    public GameScreen(MainGame juego) {
+
     // El constructor recibe el juego principal
-    public GameScreen(MainGame juego, ModoJuego modo, int nivel) {
+    public GameScreen(MainGame juego, ModoJuego modoActual, int nivel) {
         this.juego = juego;
-        this.modoActual = modo;
+        this.modoActual = modoActual;
         this.nivelActual = nivel;
 
         // Configurar la meta si es tutorial
-        if (modo == ModoJuego.TUTORIAL) {
+        if (modoActual == ModoJuego.TUTORIAL) {
             if (nivel == 1) filaMeta = 15;
             else if (nivel == 2) filaMeta = 25;
             else if (nivel == 3) filaMeta = 40;
-        }  else if (modo == ModoJuego.CONTRARRELOJ) {
+        }  else if (modoActual == ModoJuego.CONTRARRELOJ) {
         tiempoRestante = 60f; // Hay que ajustar para balancear
         }
     }
-}
+
 
     @Override
     public void show() {
@@ -181,7 +181,7 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        // Deteccion de salida, para ESC en PC y Atras de Android
+        // --- 1. DETECCIÓN DE BOTÓN DE PAUSA (ESC o Atras) ---
         if ((Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK))
             && estadoActual == EstadoJuego.JUGANDO) {
 
@@ -189,56 +189,47 @@ public class GameScreen implements Screen {
                 activarPausa();
             } else {
                 quitarPausa();
-        if (estadoActual == EstadoJuego.JUGANDO) {
-            handleInput();
-
-            // Contrarelloj logica
-            if (modoActual == ModoJuego.CONTRARRELOJ) {
-                tiempoRestante -= delta; // Restamos los milisegundos que van pasando
-                if (tiempoRestante <= 0) {
-                    tiempoRestante = 0;
-                    dispararGameOver("¡TIEMPO AGOTADO!"); // Muelto
-                }
             }
+        } // <--- ¡Esta era la llave que faltaba para liberar la lógica de abajo!
 
-            // La velocidad base es 10f, pero aumenta ligeramente por cada fila que subas.
-            scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f);
-
-            scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
-
-        } else if (estadoActual == EstadoJuego.GAME_OVER) {
-            if (Gdx.input.justTouched()) {
-                reiniciarJuego();
-            }
-        } else if (estadoActual == EstadoJuego.VICTORIA) {
-            // Si ganamos, al tocar la pantalla volvemos al menú principal
-            if (Gdx.input.justTouched()) {
-                juego.setScreen(new com.brk.chessrunner.ui.MainMenuScreen(juego, juego.db));
-            }
-        }
-
-        // --- Logica del juego para la pausa ---
+        // --- 2. LÓGICA DEL JUEGO (Se congela si está pausado) ---
         if (!juegoPausado) {
             if (estadoActual == EstadoJuego.JUGANDO) {
-                handleInput();
+
+                handleInput(); // Aquí el jugador vuelve a tener el control
+
+                // Lógica de Contrarreloj
+                if (modoActual == ModoJuego.CONTRARRELOJ) {
+                    tiempoRestante -= delta;
+                    if (tiempoRestante <= 0) {
+                        tiempoRestante = 0;
+                        dispararGameOver("¡TIEMPO AGOTADO!");
+                    }
+                }
+
+                // La velocidad base es 10f, pero aumenta ligeramente por cada fila que subas.
+                scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f);
                 scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
+
             } else if (estadoActual == EstadoJuego.GAME_OVER) {
                 if (Gdx.input.justTouched()) {
                     reiniciarJuego();
                 }
+            } else if (estadoActual == EstadoJuego.VICTORIA) {
+                // Si ganamos, al tocar la pantalla volvemos al menú principal
+                if (Gdx.input.justTouched()) {
+                    juego.setScreen(new com.brk.chessrunner.ui.MainMenuScreen(juego, juego.db));
+                }
             }
         }
-            }
 
-        }
-        // ---  Dibujado del fondo ---
+        // --- 3. DIBUJADO DEL FONDO Y MUNDO (Siempre activo) ---
         camera.update();
         juego.batch.setProjectionMatrix(camera.combined);
         ScreenUtils.clear(0f, 0f, 0f, 1f);
 
         juego.batch.begin();
 
-        // --- DIBUJADO DEL MUNDO (Tablero, sombras, enemigos, jugador) ---
         float scale = WORLD_WIDTH / texturaTablero.getWidth();
         float scaledHeight = texturaTablero.getHeight() * scale;
         float offsetY = scrollY % scaledHeight;
@@ -291,7 +282,6 @@ public class GameScreen implements Screen {
             font.getData().setScale(3f);
             font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 80);
 
-            // Mostramos si fue Jaque Mate o Tiempo Agotado
             font.getData().setScale(1.5f);
             font.draw(juego.batch, mensajeGameOver, WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f + 30);
 

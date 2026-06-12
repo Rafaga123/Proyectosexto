@@ -81,7 +81,8 @@ public class MainMenuScreen implements Screen {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 // Cambia la vista al tablero de juego
-                juego.setScreen(new GameScreen(juego, ModoJuego.INFINITO, 0)); // Esto hay que cambiarlo segun sea el modo
+                SelectModeDialog selectmode= new SelectModeDialog("Seleccionar Modo", skin, game);
+                selectmode.show(stage);
             }
         });
 

@@ -5,9 +5,11 @@ import com.badlogic.gdx.utils.Array;
 
 public class GestorEnemigos {
     public Array<Enemigo> activos;
+    public Array<PowerUp> powerUpsActivos;
 
     public GestorEnemigos() {
         activos = new Array<Enemigo>();
+        powerUpsActivos = new Array<PowerUp>();
     }
 
     // Metodo para crear un nuevo enemigo y añadirlo a la lista
@@ -52,8 +54,21 @@ public class GestorEnemigos {
         }
     }
 
-    // Limpieza de memoria
-    public void limpiarEnemigosPasados(int filaBasePantalla) {
+    // Metodo para recoger un power-up si el jugador cae sobre él
+    public TipoPowerUp intentarRecogerPowerUp(int col, int fila) {
+        for (int i = powerUpsActivos.size - 1; i >= 0; i--) {
+            PowerUp p = powerUpsActivos.get(i);
+            if (p.colLogica == col && p.filLogica == fila) {
+                TipoPowerUp tipo = p.tipo;
+                powerUpsActivos.removeIndex(i);
+                return tipo;
+            }
+        }
+        return null;
+    }
+
+    // Limpieza de memoria para enemigos y power-ups
+    public void limpiarObjetosPasados(int filaBasePantalla) {
         // Iteramos el array de atrás hacia adelante para poder borrar elementos sin que se rompa el bucle
         for (int i = activos.size - 1; i >= 0; i--) {
             Enemigo e = activos.get(i);
@@ -62,6 +77,19 @@ public class GestorEnemigos {
                 activos.removeIndex(i);
             }
         }
+
+        for (int i = powerUpsActivos.size - 1; i >= 0; i--) {
+            PowerUp p = powerUpsActivos.get(i);
+            if (p.filLogica < filaBasePantalla - 2) {
+                powerUpsActivos.removeIndex(i);
+            }
+        }
+    }
+
+    // Limpia todas las listas de objetos activos
+    public void vaciar() {
+        activos.clear();
+        powerUpsActivos.clear();
     }
 
     // Algoritmo de Búsqueda en Anchura (BFS) para garantizar que el nivel es pasable
@@ -125,6 +153,9 @@ public class GestorEnemigos {
             return;
         }
 
+        // Intentar generar un power-up en la misma franja de avance
+        intentarGenerarPowerUp(filaJugador);
+
         int filaAparicion = filaJugador + 6;
 
         // Bajamos a 2 intentos por fila para dar más espacio orgánico
@@ -149,6 +180,25 @@ public class GestorEnemigos {
                         System.out.println("Generación vetada: El " + tipoElegido + " bloqueaba todos los caminos.");
                     }
                 }
+            }
+        }
+    }
+
+    // Metodo para generar power-ups aleatoriamente
+    public void intentarGenerarPowerUp(int filaJugador) {
+        // Probabilidad baja (ej. 5%) de generar un power-up en una fila lejana
+        if (MathUtils.randomBoolean(0.05f)) {
+            int filaAparicion = filaJugador + 8;
+            int colAleatoria = MathUtils.random(0, 4);
+
+            // Solo generar si la casilla está vacía de enemigos y otros power-ups
+            if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
+                for (PowerUp p : powerUpsActivos) {
+                    if (p.colLogica == colAleatoria && p.filLogica == filaAparicion) return;
+                }
+
+                TipoPowerUp tipo = TipoPowerUp.values()[MathUtils.random(TipoPowerUp.values().length - 1)];
+                powerUpsActivos.add(new PowerUp(tipo, colAleatoria, filaAparicion));
             }
         }
     }

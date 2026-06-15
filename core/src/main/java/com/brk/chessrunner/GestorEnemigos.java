@@ -5,9 +5,11 @@ import com.badlogic.gdx.utils.Array;
 
 public class GestorEnemigos {
     public Array<Enemigo> activos;
+    public Array<PowerUp> powerUpsActivos;
 
     public GestorEnemigos() {
         activos = new Array<Enemigo>();
+        powerUpsActivos = new Array<PowerUp>();
     }
 
     // Metodo para crear un nuevo enemigo y añadirlo a la lista
@@ -52,8 +54,21 @@ public class GestorEnemigos {
         }
     }
 
-    // Limpieza de memoria
-    public void limpiarEnemigosPasados(int filaBasePantalla) {
+    // Metodo para recoger un power-up si el jugador cae sobre él
+    public TipoPowerUp intentarRecogerPowerUp(int col, int fila) {
+        for (int i = powerUpsActivos.size - 1; i >= 0; i--) {
+            PowerUp p = powerUpsActivos.get(i);
+            if (p.colLogica == col && p.filLogica == fila) {
+                TipoPowerUp tipo = p.tipo;
+                powerUpsActivos.removeIndex(i);
+                return tipo;
+            }
+        }
+        return null;
+    }
+
+    // Limpieza de memoria para enemigos y power-ups
+    public void limpiarObjetosPasados(int filaBasePantalla) {
         // Iteramos el array de atrás hacia adelante para poder borrar elementos sin que se rompa el bucle
         for (int i = activos.size - 1; i >= 0; i--) {
             Enemigo e = activos.get(i);
@@ -62,7 +77,21 @@ public class GestorEnemigos {
                 activos.removeIndex(i);
             }
         }
+
+        for (int i = powerUpsActivos.size - 1; i >= 0; i--) {
+            PowerUp p = powerUpsActivos.get(i);
+            if (p.filLogica < filaBasePantalla - 2) {
+                powerUpsActivos.removeIndex(i);
+            }
+        }
     }
+
+    // Limpia todas las listas de objetos activos
+    public void vaciar() {
+        activos.clear();
+        powerUpsActivos.clear();
+    }
+
     // Algoritmo de Búsqueda en Anchura (BFS) para garantizar que el nivel es pasable
     private boolean existeCaminoSeguro(int colInicio, int filaInicio, int filaMeta) {
         // Calculo de cuántas filas hay de diferencia para dimensionar nuestro mapa de visitados
@@ -119,12 +148,13 @@ public class GestorEnemigos {
     }
 
     // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
-    public void intentarGenerarEnemigos(int filaJugador, int colJugador) {
-        // LÍMITE DE POBLACIÓN: Si hay 10 o más enemigos en pantalla, no generamos más.
-        // Esto evita la saturación extrema del 100% que veías en la imagen.
+    public void intentarGenerarEnemigos(int filaJugador, int colJugador, ModoJuego modo, int nivel) {
         if (activos.size >= 10) {
             return;
         }
+
+        // Intentar generar un power-up en la misma franja de avance
+        intentarGenerarPowerUp(filaJugador);
 
         int filaAparicion = filaJugador + 6;
 
@@ -136,8 +166,8 @@ public class GestorEnemigos {
             if (MathUtils.randomBoolean(0.5f)) {
                 int colAleatoria = MathUtils.random(0, 4);
 
-                // Usamos nuestro nuevo sistema de pesos en lugar del arreglo plano
-                TipoPieza tipoElegido = obtenerPiezaAleatoria();
+                // Pasamos el modo y nivel al sistema de pesos
+                TipoPieza tipoElegido = obtenerPiezaAleatoria(modo, nivel);
 
                 if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
                     Enemigo nuevoEnemigo = new Enemigo(tipoElegido, colAleatoria, filaAparicion);
@@ -154,6 +184,25 @@ public class GestorEnemigos {
         }
     }
 
+    // Metodo para generar power-ups aleatoriamente
+    public void intentarGenerarPowerUp(int filaJugador) {
+        // Probabilidad baja (ej. 5%) de generar un power-up en una fila lejana
+        if (MathUtils.randomBoolean(0.05f)) {
+            int filaAparicion = filaJugador + 8;
+            int colAleatoria = MathUtils.random(0, 4);
+
+            // Solo generar si la casilla está vacía de enemigos y otros power-ups
+            if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
+                for (PowerUp p : powerUpsActivos) {
+                    if (p.colLogica == colAleatoria && p.filLogica == filaAparicion) return;
+                }
+
+                TipoPowerUp tipo = TipoPowerUp.values()[MathUtils.random(TipoPowerUp.values().length - 1)];
+                powerUpsActivos.add(new PowerUp(tipo, colAleatoria, filaAparicion));
+            }
+        }
+    }
+
     // Metodo para verificar si una casilla ya esta ocupada
     private boolean hayEnemigoEnCasilla(int col, int fila) {
         for (Enemigo e : activos) {
@@ -165,22 +214,28 @@ public class GestorEnemigos {
     }
 
     // Sistema de pesos para balancear la aparición de piezas
-    private TipoPieza obtenerPiezaAleatoria() {
+    private TipoPieza obtenerPiezaAleatoria(ModoJuego modo, int nivel) {
+        if (modo == ModoJuego.TUTORIAL) {
+            if (nivel == 1) {
+                return TipoPieza.PEON; // Nivel 1: solo se crearan peones
+            } else if (nivel == 2) {
+                // Nivel 2: Peones a un 70% y Caballos 30%
+                return MathUtils.randomBoolean(0.7f) ? TipoPieza.PEON : TipoPieza.CABALLO;
+            } else if (nivel == 3) {
+                // Nivel 3: Peones (50%), Caballos (30%), Alfiles (20%)
+                int tirada = MathUtils.random(1, 100);
+                if (tirada <= 50) return TipoPieza.PEON;
+                if (tirada <= 80) return TipoPieza.CABALLO;
+                return TipoPieza.ALFIL;
+            }
+        }
+
+        // Para el modo Infinito o Contrarreloj, vamos a usar la distribución normal (o sea todo normalito)
         int tirada = MathUtils.random(1, 100);
-
-        // 45% de probabilidad de ser un Peón
         if (tirada <= 45) return TipoPieza.PEON;
-
-        // 25% de probabilidad de ser un Caballo
         if (tirada <= 70) return TipoPieza.CABALLO;
-
-        // 15% de probabilidad de ser un Alfil
         if (tirada <= 85) return TipoPieza.ALFIL;
-
-        // 10% de probabilidad de ser una Torre
         if (tirada <= 95) return TipoPieza.TORRE;
-
-        // Solo 5% de probabilidad de ser una Reina
         return TipoPieza.REINA;
     }
 }

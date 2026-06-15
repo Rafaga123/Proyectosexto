@@ -27,10 +27,12 @@ public class GameScreen implements Screen {
     OrthographicCamera camera;
     Viewport viewport;
     Vector3 touchPoint;
+    com.badlogic.gdx.graphics.g2d.BitmapFont font;
 
     public enum EstadoJuego {
         JUGANDO,
-        GAME_OVER
+        GAME_OVER,
+        VICTORIA
     }
     EstadoJuego estadoActual = EstadoJuego.JUGANDO;
 
@@ -43,6 +45,11 @@ public class GameScreen implements Screen {
     float scrollSpeed = 10f;
     int filaLogicaJugador = 0;
     GestorEnemigos gestorEnemigos;
+    public ModoJuego modoActual;
+    public int nivelActual;
+    public int filaMeta = -2; // -2 = Infinito (No hay meta)
+    public float tiempoRestante;
+    public String mensajeGameOver = "";
 
     TextureRegion piezaRey;
     int configColorEnemigo = 1;
@@ -63,6 +70,20 @@ public class GameScreen implements Screen {
     float dragX = 0f;
     float dragY = 0f;
 
+    // --- VARIABLES DE POWER-UPS ---
+    public boolean tieneEscudo = false;
+    public float tiempoEscudo = 0f;
+
+    public int movimientosCambio = 0;
+    public TipoPieza piezaTransformada;
+
+    public int movimientosIA = 0;
+    public float temporizadorIA = 0f;
+
+    public float tiempoReloj = 0f;
+
+    private Texture texturaPixelBlanco;
+
     // --- VARIABLES DE INTERFAZ DE PAUSA ---
 
     private com.badlogic.gdx.scenes.scene2d.ui.Table hudTable; // Cambiado a mayúscula para seguir el estándar
@@ -74,13 +95,29 @@ public class GameScreen implements Screen {
     private boolean juegoPausado = false;
     private float tiempoJugado = 0f;
 
-    public GameScreen(MainGame juego) {
+
+    // El constructor recibe el juego principal
+    public GameScreen(MainGame juego, ModoJuego modoActual, int nivel) {
         this.juego = juego;
+        this.modoActual = modoActual;
+        this.nivelActual = nivel;
+
+        // Configurar la meta si es tutorial
+        if (modoActual == ModoJuego.TUTORIAL) {
+            if (nivel == 1) filaMeta = 15;
+            else if (nivel == 2) filaMeta = 25;
+            else if (nivel == 3) filaMeta = 40;
+        }  else if (modoActual == ModoJuego.CONTRARRELOJ) {
+        tiempoRestante = 60f; // Hay que ajustar para balancear
+        }
     }
+
 
     @Override
     public void show() {
         touchPoint = new Vector3();
+        font = new com.badlogic.gdx.graphics.g2d.BitmapFont();
+        font.getData().setScale(2f);
 
         //Esto seria para el regreso dentro de movil
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
@@ -96,6 +133,11 @@ public class GameScreen implements Screen {
         asignarSetDePiezas(configColorEnemigo);
 
         gestorEnemigos = new GestorEnemigos();
+        com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        pixmap.setColor(com.badlogic.gdx.graphics.Color.WHITE);
+        pixmap.fill();
+        texturaPixelBlanco = new Texture(pixmap);
+        pixmap.dispose(); // Liberamos la memoria del constructor
 
         camera = new OrthographicCamera();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
@@ -159,7 +201,7 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        // Deteccion de salida, para ESC en PC y Atras de Android
+        // --- 1. DETECCIÓN DE BOTÓN DE PAUSA (ESC o Atras) ---
         if ((Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK))
             && estadoActual == EstadoJuego.JUGANDO) {
 
@@ -170,20 +212,59 @@ public class GameScreen implements Screen {
             }
         }
 
-        // --- Logica del juego para la pausa ---
+        // --- 2. LÓGICA DEL JUEGO (Se congela si está pausado) ---
         if (!juegoPausado) {
             if (estadoActual == EstadoJuego.JUGANDO) {
-                handleInput();
+
+                // Gestión de Escudo
+                if (tiempoEscudo > 0) {
+                    tiempoEscudo -= delta;
+                    if (tiempoEscudo <= 0) tieneEscudo = false;
+                }
+
+                // Control: ¿Juega el humano o juega la IA?
+                if (movimientosIA > 0) {
+                    temporizadorIA -= delta;
+                    if (temporizadorIA <= 0) {
+                        ejecutarMovimientoIA();
+                        movimientosIA--;
+                        temporizadorIA = 0.3f; // 1 movimiento cada 0.3 segundos para ver la animación
+                    }
+                } else {
+                    handleInput();
+                }
+
+                // Lógica de Reloj / Contrarreloj / Velocidad
+                if (tiempoReloj > 0) {
+                    tiempoReloj -= delta;
+                    scrollSpeed = (10f + (filaMaximaAlcanzada * 0.25f)) * 0.4f; // Cámara lenta (60% más lento)
+                    // No restamos 'tiempoRestante', por lo que el reloj de la partida se congela
+                } else {
+                    scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f);
+                    if (modoActual == ModoJuego.CONTRARRELOJ) {
+                        tiempoRestante -= delta;
+                        if (tiempoRestante <= 0) {
+                            tiempoRestante = 0;
+                            dispararGameOver("¡TIEMPO AGOTADO!");
+                        }
+                    }
+                }
+
                 scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
                 tiempoJugado += delta;
             } else if (estadoActual == EstadoJuego.GAME_OVER) {
                 if (Gdx.input.justTouched()) {
                     reiniciarJuego();
                 }
+            } else if (estadoActual == EstadoJuego.VICTORIA) {
+                // Si ganamos, al tocar la pantalla volvemos al menú principal
+                if (Gdx.input.justTouched()) {
+                    juego.setScreen(new com.brk.chessrunner.ui.MainMenuScreen(juego, juego.db));
+                }
             }
         }
 
-        // ---  Dibujado del fondo ---
+        // --- 3. DIBUJADO DEL FONDO Y MUNDO (Siempre activo) ---
         camera.update();
         juego.batch.setProjectionMatrix(camera.combined);
         ScreenUtils.clear(0f, 0f, 0f, 1f);
@@ -224,6 +305,77 @@ public class GameScreen implements Screen {
             float px = jugadorCol * CELL_W;
             float py = JUGADOR_FILA_VIS * CELL_H;
             juego.batch.draw(piezaRey, px, py, CELL_W, CELL_H);
+        }
+
+        // --- DIBUJADO DE LA INTERFAZ DE USUARIO (TEXTOS) ---
+        if (estadoActual == EstadoJuego.JUGANDO) {
+            if (modoActual == ModoJuego.TUTORIAL) {
+                font.draw(juego.batch, "Tutorial " + nivelActual + " - Meta: " + filaMeta, 20, WORLD_HEIGHT - 20);
+            } else {
+                font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, WORLD_HEIGHT - 20);
+
+                // HUD Exclusivo de Contrarreloj
+                if (modoActual == ModoJuego.CONTRARRELOJ) {
+                    font.draw(juego.batch, "Tiempo: " + (int)tiempoRestante + "s", 20, WORLD_HEIGHT - 60);
+                }
+            }
+        } else if (estadoActual == EstadoJuego.GAME_OVER) {
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 80);
+
+            font.getData().setScale(1.5f);
+            font.draw(juego.batch, mensajeGameOver, WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f + 30);
+
+            font.getData().setScale(2f);
+            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), WORLD_WIDTH / 2f - 70, WORLD_HEIGHT / 2f - 20);
+
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 70);
+
+            font.getData().setScale(2f);
+        } else if (estadoActual == EstadoJuego.VICTORIA) {
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "¡VICTORIA!", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
+
+            font.getData().setScale(1.5f);
+            font.draw(juego.batch, "Tutorial completado", WORLD_WIDTH / 2f - 100, WORLD_HEIGHT / 2f - 10);
+
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para continuar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
+
+            font.getData().setScale(2f);
+        }
+        // Dibujar cajas de Power-Ups
+        for (PowerUp p : gestorEnemigos.powerUpsActivos) {
+            float px = p.colLogica * CELL_W;
+            float py = (p.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
+
+            if (py > -CELL_H && py < WORLD_HEIGHT + CELL_H) {
+                if (p.tipo == TipoPowerUp.CAMBIO) juego.batch.setColor(com.badlogic.gdx.graphics.Color.MAGENTA);
+                else if (p.tipo == TipoPowerUp.ESCUDO) juego.batch.setColor(com.badlogic.gdx.graphics.Color.BLUE);
+                else if (p.tipo == TipoPowerUp.SACUDIR_MESA) juego.batch.setColor(com.badlogic.gdx.graphics.Color.ORANGE);
+                else if (p.tipo == TipoPowerUp.TUMBAR_MESA) juego.batch.setColor(com.badlogic.gdx.graphics.Color.RED);
+                else if (p.tipo == TipoPowerUp.IA) juego.batch.setColor(com.badlogic.gdx.graphics.Color.GREEN);
+                else if (p.tipo == TipoPowerUp.RELOJ) juego.batch.setColor(com.badlogic.gdx.graphics.Color.CYAN);
+
+                juego.batch.draw(texturaPixelBlanco, px + 15, py + 15, CELL_W - 30, CELL_H - 30);
+                juego.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
+            }
+        }
+
+        // Definir qué textura usar para el jugador (Rey o Transformación)
+        TextureRegion regionDibujo = (movimientosCambio > 0 && piezaTransformada != null) ? regionesEnemigos.get(piezaTransformada) : piezaRey;
+
+        float pxJugador = isDragging ? dragX : (jugadorCol * CELL_W);
+        float pyJugador = isDragging ? dragY : (JUGADOR_FILA_VIS * CELL_H);
+
+        juego.batch.draw(regionDibujo, pxJugador, pyJugador, CELL_W, CELL_H);
+
+        // Dibujar aura de Escudo si está activo
+        if (tieneEscudo) {
+            juego.batch.setColor(0, 0, 1, 0.4f);
+            juego.batch.draw(texturaPixelBlanco, jugadorCol * CELL_W, JUGADOR_FILA_VIS * CELL_H, CELL_W, CELL_H);
+            juego.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
         }
 
         juego.batch.end();
@@ -268,9 +420,34 @@ public class GameScreen implements Screen {
                 int limiteInferior = Math.max(0, filaMaximaAlcanzada - 1);
                 boolean retrocesoValido = nuevaFilaLogica >= limiteInferior;
 
-                if (targetCol >= 0 && targetCol < COLS &&
-                    Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 &&
-                    (diffCol != 0 || diffRow != 0) && retrocesoValido) {
+                boolean movimientoValido = false;
+
+                // Lógica del CAMBIO (Permite teletransportarse al destino si cumple las reglas de la pieza)
+                if (movimientosCambio > 0) {
+                    switch (piezaTransformada) {
+                        case TORRE:
+                            movimientoValido = (diffCol == 0 || diffRow == 0) && retrocesoValido;
+                            break;
+                        case ALFIL:
+                            movimientoValido = (Math.abs(diffCol) == Math.abs(diffRow)) && retrocesoValido;
+                            break;
+                        case CABALLO:
+                            movimientoValido = ((Math.abs(diffCol) == 1 && Math.abs(diffRow) == 2) || (Math.abs(diffCol) == 2 && Math.abs(diffRow) == 1)) && retrocesoValido;
+                            break;
+                        case REINA:
+                            movimientoValido = (diffCol == 0 || diffRow == 0 || Math.abs(diffCol) == Math.abs(diffRow)) && retrocesoValido;
+                            break;
+                        default:
+                            movimientoValido = Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;
+                    }
+                } else {
+                    // Reglas base del Rey
+                    movimientoValido = Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;
+                }
+
+                if (targetCol >= 0 && targetCol < COLS && (diffCol != 0 || diffRow != 0) && movimientoValido) {
+
+                    if (movimientosCambio > 0) movimientosCambio--;
 
                     jugadorCol = targetCol;
                     filaLogicaJugador = nuevaFilaLogica;
@@ -280,59 +457,27 @@ public class GameScreen implements Screen {
                     }
 
                     targetScrollY = filaLogicaJugador * CELL_H;
-
                     gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
 
+                    recolectarPowerUpsLocal();
+
                     if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
-                        System.out.println("¡JAQUE MATE! Game Over.");
-                        estadoActual = EstadoJuego.GAME_OVER;
-
-                        // Identificamos quién nos mató
-                        String piezaAsesina = "Desconocida";
-                        for (Enemigo e : gestorEnemigos.activos) {
-                            if (e.atacaCasilla(jugadorCol, filaLogicaJugador)) {
-                                piezaAsesina = e.tipo.name();
-                                break;
-                            }
-                        }
-
-                        // Obtenemos el usuario y guardamos usando el db del gestor "juego"
-                        if (juego.db != null) {
-                            UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
-
-                            if (jugadorActual != null) {
-                                String idPartida = UUID.randomUUID().toString();
-                                int puntuacion = filaMaximaAlcanzada * 10;
-                                String fechaIso = java.time.LocalDateTime.now().toString();
-
-                                PartidaLocal nuevaPartida = new PartidaLocal(
-                                    idPartida, 
-                                    jugadorActual.getId(), 
-                                    puntuacion, 
-                                    filaMaximaAlcanzada, 
-                                    piezaAsesina, 
-                                    (int) tiempoJugado, 
-                                    fechaIso, 
-                                    false
-                                );
-                                juego.db.guardarPartida(nuevaPartida);
-
-                                // --- SINCRONIZACIÓN AUTOMÁTICA AL MORIR ---
-                                com.brk.chessrunner.network.SyncManager.syncSilently(juego.db, uiStage, uiSkin);
-                            } else {
-                                System.err.println("No se pudo guardar: No hay usuario activo.");
-                            }
+                        if (tieneEscudo) {
+                            tieneEscudo = false;
+                            tiempoEscudo = 0f;
+                        } else {
+                            dispararGameOver("¡JAQUE MATE!");
                         }
                     } else {
-                        System.out.println("Avanzaste a una zona segura.");
+                        if (diffRow > 0) {
+                            gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
+                            gestorEnemigos.intentarGenerarPowerUp(filaLogicaJugador);
+                        }
                     }
 
-                    if (diffRow > 0) {
-                        gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol);
-                    }
+                    gestorEnemigos.limpiarObjetosPasados((int) (scrollY / CELL_H));
+                    if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) estadoActual = EstadoJuego.VICTORIA;
 
-                    int filaBase = (int) (scrollY / CELL_H);
-                    gestorEnemigos.limpiarEnemigosPasados(filaBase);
                 }
             }
         }
@@ -346,9 +491,9 @@ public class GameScreen implements Screen {
         }
     }
 
-    public int getFilaLogica() {
-        return (int)(scrollY / CELL_H) + JUGADOR_FILA_VIS;
-    }
+//    public int getFilaLogica() {
+//        return (int)(scrollY / CELL_H) + JUGADOR_FILA_VIS;
+//    }
 
     private void reiniciarJuego() {
         scrollY = 0f;
@@ -358,8 +503,163 @@ public class GameScreen implements Screen {
         jugadorCol = 2;
         tiempoJugado = 0f;
 
-        gestorEnemigos.activos.clear();
+        if (modoActual == ModoJuego.CONTRARRELOJ) {
+            tiempoRestante = 60f;
+        }
+
+        gestorEnemigos.vaciar();
         estadoActual = EstadoJuego.JUGANDO;
+    }
+
+    private void activarPowerUp(TipoPowerUp tipo) {
+        System.out.println("Power-up recolectado: " + tipo);
+        switch (tipo) {
+            case CAMBIO:
+                // Otorga entre 5 y 10 movimientos
+                movimientosCambio = com.badlogic.gdx.math.MathUtils.random(5, 10);
+                // Elige una pieza al azar (Torre, Alfil, Caballo o Reina)
+                TipoPieza[] piezas = {TipoPieza.TORRE, TipoPieza.CABALLO, TipoPieza.ALFIL, TipoPieza.REINA};
+                piezaTransformada = piezas[com.badlogic.gdx.math.MathUtils.random(0, piezas.length - 1)];
+                break;
+            case ESCUDO:
+                tieneEscudo = true;
+                tiempoEscudo = 15f; // 15 segundos de protección
+                break;
+            case SACUDIR_MESA:
+                int eliminar = com.badlogic.gdx.math.MathUtils.random(2, 4);
+                for (int i = 0; i < eliminar; i++) {
+                    if (gestorEnemigos.activos.size > 0) {
+                        int r = com.badlogic.gdx.math.MathUtils.random(0, gestorEnemigos.activos.size - 1);
+                        gestorEnemigos.activos.removeIndex(r);
+                    }
+                }
+                break;
+            case TUMBAR_MESA:
+                // Al limpiar la memoria, destruye todo lo visible y lo que se acaba de generar fuera de cámara
+                gestorEnemigos.activos.clear();
+                break;
+            case IA:
+                movimientosIA = com.badlogic.gdx.math.MathUtils.random(8, 10);
+                temporizadorIA = 0f; // Actúa inmediatamente
+                break;
+            case RELOJ:
+                tiempoReloj = 5f;
+                break;
+        }
+    }
+
+    private void recolectarPowerUpsLocal() {
+        for (int i = gestorEnemigos.powerUpsActivos.size - 1; i >= 0; i--) {
+            PowerUp p = gestorEnemigos.powerUpsActivos.get(i);
+            if (p.colLogica == jugadorCol && p.filLogica == filaLogicaJugador) {
+                activarPowerUp(p.tipo);
+                gestorEnemigos.powerUpsActivos.removeIndex(i);
+            }
+        }
+    }
+
+    private void ejecutarMovimientoIA() {
+        int mejorCol = jugadorCol;
+        int mejorFila = filaLogicaJugador;
+        boolean movio = false;
+
+        int nuevaFila = filaLogicaJugador + 1;
+        // Prioridad: frente, diagonales, esquinas
+        int[] columnasPosibles = {jugadorCol, jugadorCol - 1, jugadorCol + 1, jugadorCol - 2, jugadorCol + 2};
+
+        // Intentar avanzar
+        for (int col : columnasPosibles) {
+            if (col >= 0 && col < COLS) {
+                if (!gestorEnemigos.estaCasillaAmenazada(col, nuevaFila) && !gestorEnemigos.estaCasillaDefendida(col, nuevaFila)) {
+                    mejorCol = col;
+                    mejorFila = nuevaFila;
+                    movio = true;
+                    break;
+                }
+            }
+        }
+
+        // Si no puede avanzar, intentar moverse a los lados
+        if (!movio) {
+            for (int col : columnasPosibles) {
+                if (col >= 0 && col < COLS && col != jugadorCol) {
+                    if (!gestorEnemigos.estaCasillaAmenazada(col, filaLogicaJugador) && !gestorEnemigos.estaCasillaDefendida(col, filaLogicaJugador)) {
+                        mejorCol = col;
+                        mejorFila = filaLogicaJugador;
+                        movio = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Si está completamente acorralado, avanza de frente para sacrificar el escudo o morir
+        if (!movio) mejorFila = filaLogicaJugador + 1;
+
+        int diffRow = mejorFila - filaLogicaJugador;
+        jugadorCol = mejorCol;
+        filaLogicaJugador = mejorFila;
+
+        if (filaLogicaJugador > filaMaximaAlcanzada) filaMaximaAlcanzada = filaLogicaJugador;
+        targetScrollY = filaLogicaJugador * CELL_H;
+
+        gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
+        recolectarPowerUpsLocal();
+
+        if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
+            if (tieneEscudo) {
+                tieneEscudo = false;
+                tiempoEscudo = 0f;
+            } else {
+                dispararGameOver("¡JAQUE MATE!");
+                movimientosIA = 0; // Abortar IA
+            }
+        } else {
+            if (diffRow > 0) {
+                gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
+                gestorEnemigos.intentarGenerarPowerUp(filaLogicaJugador);
+            }
+        }
+
+        gestorEnemigos.limpiarObjetosPasados((int) (scrollY / CELL_H));
+        if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) estadoActual = EstadoJuego.VICTORIA;
+    }
+
+    private void dispararGameOver(String razon) {
+        System.out.println(razon + " Game Over.");
+        mensajeGameOver = razon;
+        estadoActual = EstadoJuego.GAME_OVER;
+
+        // Identificamos qué pieza nos mató
+        String piezaAsesina = "Desconocida";
+        for (Enemigo e : gestorEnemigos.activos) {
+            if (e.atacaCasilla(jugadorCol, filaLogicaJugador)) {
+                piezaAsesina = e.tipo.name();
+                break;
+            }
+        }
+
+        // Obtenemos el usuario y guardamos en BD local
+        if (juego.db != null) {
+            com.brk.chessrunner.database.UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
+
+            if (jugadorActual != null) {
+                String idPartida = java.util.UUID.randomUUID().toString();
+                int puntuacion = filaMaximaAlcanzada * 10;
+                int tiempoSobrevivido = (modoActual == ModoJuego.CONTRARRELOJ) ? (int)(60f - tiempoRestante) : (int) tiempoJugado;
+                String fechaIso = java.time.LocalDateTime.now().toString();
+
+                com.brk.chessrunner.database.PartidaLocal nuevaPartida = new com.brk.chessrunner.database.PartidaLocal(
+                    idPartida, jugadorActual.getId(), puntuacion, filaMaximaAlcanzada,
+                    piezaAsesina, tiempoSobrevivido, fechaIso, false
+                );
+                juego.db.guardarPartida(nuevaPartida);
+
+                com.brk.chessrunner.network.SyncManager.syncSilently(juego.db, uiStage, uiSkin);
+            } else {
+                System.err.println("No se pudo guardar: No hay usuario activo.");
+            }
+        }
     }
 
     public void asignarSetDePiezas(int color) {
@@ -381,7 +681,7 @@ public class GameScreen implements Screen {
         piezaRey = matrizJugador[0][0];
     }
 
-    public void alternarColorEnemigo() {
+    public void alternarColorEnemigo() { // Sigue sin uso hasta crear la configuracion - igual que los tableros
         configColorEnemigo = (configColorEnemigo == 1) ? 2 : 1;
         asignarSetDePiezas(configColorEnemigo);
     }
@@ -406,8 +706,10 @@ public class GameScreen implements Screen {
         SombraB.dispose();
         texturaPiezasNegras.dispose();
         texturaPiezasBlancas.dispose();
+        if (texturaPixelBlanco != null) texturaPixelBlanco.dispose();
 
         if (uiStage != null) uiStage.dispose();
         if (uiSkin != null) uiSkin.dispose();
+        font.dispose();
     }
 }

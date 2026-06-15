@@ -199,3 +199,6 @@ startScripts.classpath = project.tasks.jar.outputs.files
 if(enableGraalNative == 'true') {
   apply from: file("nativeimage.gradle")
 }
+processResources {
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

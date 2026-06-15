@@ -7,8 +7,12 @@ import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 
 public class ApiClient {
-    // Luego buscar la forma de que esta BASE_URL se pueda cambiar dinamicamente durante la ejecución de la aplicación
-    private static final String BASE_URL = "http://localhost:58080/api";
+
+    public static String getBaseUrl() {
+        String ip = Gdx.app.getPreferences("ChessRunnerSettings")
+            .getString("serverIp", "192.168.1.100");
+        return "http://" + ip + ":58080/api";
+    }
 
     // Interfaz para manejar las respuestas sin congelar el juego
     public interface ApiCallback {
@@ -50,7 +54,7 @@ public class ApiClient {
 
         Net.HttpRequest httpRequest = requestBuilder.newRequest()
             .method(Net.HttpMethods.POST)
-            .url(BASE_URL + "/usuarios/login")
+            .url(getBaseUrl() + "/usuarios/login")
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .content(jsonBody)
@@ -114,7 +118,7 @@ public class ApiClient {
 
         Net.HttpRequest httpRequest = requestBuilder.newRequest()
             .method(Net.HttpMethods.POST)
-            .url(BASE_URL + "/partidas/sync/" + usuarioId)
+            .url(getBaseUrl() + "/partidas/sync/" + usuarioId)
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .content(jsonBody.toString())

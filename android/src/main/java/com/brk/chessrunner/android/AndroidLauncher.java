@@ -5,6 +5,7 @@ import android.os.Bundle;
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 import com.brk.chessrunner.MainGame;
+import com.brk.chessrunner.android.database.AndroidDatabaseManager;
 
 /** Launches the Android application. */
 public class AndroidLauncher extends AndroidApplication {
@@ -12,7 +13,11 @@ public class AndroidLauncher extends AndroidApplication {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         AndroidApplicationConfiguration configuration = new AndroidApplicationConfiguration();
-        configuration.useImmersiveMode = true; // Recommended, but not required.
-        initialize(new MainGame(null), configuration);
+        configuration.useImmersiveMode = true;
+
+        AndroidDatabaseManager dbManager = new AndroidDatabaseManager(this);
+        dbManager.conectar(null);
+
+        initialize(new MainGame(dbManager), configuration);
     }
 }

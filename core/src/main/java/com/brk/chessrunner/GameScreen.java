@@ -12,7 +12,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.ObjectMap;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.brk.chessrunner.database.PartidaLocal;
 import com.brk.chessrunner.database.UsuarioLocal;
@@ -87,7 +86,6 @@ public class GameScreen implements Screen {
     // --- VARIABLES DE INTERFAZ DE PAUSA ---
 
     private com.badlogic.gdx.scenes.scene2d.ui.Table hudTable; // Cambiado a mayúscula para seguir el estándar
-    private com.badlogic.gdx.scenes.scene2d.ui.TextButton btnPausaHUD;
     private Stage uiStage;
     private Skin uiSkin;
     private PauseWidget pauseWidget;
@@ -123,7 +121,7 @@ public class GameScreen implements Screen {
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
 
         texturaTablero = new Texture(Gdx.files.internal("tablero.png"));
-        texturaTablero.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        texturaTablero.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         SombraA = new Texture(Gdx.files.internal("sombra_a.png"));
         SombraB = new Texture(Gdx.files.internal("sombra_b.png"));
 
@@ -144,7 +142,7 @@ public class GameScreen implements Screen {
         camera.position.set(WORLD_WIDTH / 2f, WORLD_HEIGHT / 2f, 0);
 
         // --- INICIALIZACIÓN DE LA UI DE PAUSA ---
-        uiStage = new Stage(new ScreenViewport());
+        uiStage = new Stage(new FitViewport(WORLD_WIDTH, WORLD_HEIGHT));
 
         try {
             uiSkin = new Skin(Gdx.files.internal("ui/uiskin.json"));
@@ -156,7 +154,7 @@ public class GameScreen implements Screen {
         hudTable = new com.badlogic.gdx.scenes.scene2d.ui.Table();
         hudTable.setFillParent(true);
 
-        btnPausaHUD = new com.badlogic.gdx.scenes.scene2d.ui.TextButton("||", uiSkin);
+        com.badlogic.gdx.scenes.scene2d.ui.TextButton btnPausaHUD = new com.badlogic.gdx.scenes.scene2d.ui.TextButton("||", uiSkin);
         btnPausaHUD.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override
             public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
@@ -424,22 +422,16 @@ public class GameScreen implements Screen {
 
                 // Lógica del CAMBIO (Permite teletransportarse al destino si cumple las reglas de la pieza)
                 if (movimientosCambio > 0) {
-                    switch (piezaTransformada) {
-                        case TORRE:
-                            movimientoValido = (diffCol == 0 || diffRow == 0) && retrocesoValido;
-                            break;
-                        case ALFIL:
-                            movimientoValido = (Math.abs(diffCol) == Math.abs(diffRow)) && retrocesoValido;
-                            break;
-                        case CABALLO:
-                            movimientoValido = ((Math.abs(diffCol) == 1 && Math.abs(diffRow) == 2) || (Math.abs(diffCol) == 2 && Math.abs(diffRow) == 1)) && retrocesoValido;
-                            break;
-                        case REINA:
-                            movimientoValido = (diffCol == 0 || diffRow == 0 || Math.abs(diffCol) == Math.abs(diffRow)) && retrocesoValido;
-                            break;
-                        default:
-                            movimientoValido = Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;
-                    }
+                    movimientoValido = switch (piezaTransformada) {
+                        case TORRE -> (diffCol == 0 || diffRow == 0) && retrocesoValido;
+                        case ALFIL -> (Math.abs(diffCol) == Math.abs(diffRow)) && retrocesoValido;
+                        case CABALLO ->
+                            ((Math.abs(diffCol) == 1 && Math.abs(diffRow) == 2) || (Math.abs(diffCol) == 2 && Math.abs(diffRow) == 1)) && retrocesoValido;
+                        case REINA ->
+                            (diffCol == 0 || diffRow == 0 || Math.abs(diffCol) == Math.abs(diffRow)) && retrocesoValido;
+                        default ->
+                            Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;
+                    };
                 } else {
                     // Reglas base del Rey
                     movimientoValido = Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;

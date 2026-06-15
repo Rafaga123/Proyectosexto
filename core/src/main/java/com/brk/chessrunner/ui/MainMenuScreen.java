@@ -10,7 +10,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.brk.chessrunner.GameScreen;
 import com.brk.chessrunner.MainGame;
 import com.brk.chessrunner.ModoJuego;
@@ -34,7 +34,7 @@ public class MainMenuScreen implements Screen {
     @Override
     public void show() {
         // El Stage es el "teatro" donde pondremos los botones
-        stage = new Stage(new ScreenViewport());
+        stage = new Stage(new FitViewport(480, 800));
         Gdx.input.setInputProcessor(stage); // Permite que los botones reciban clics
 
         try{

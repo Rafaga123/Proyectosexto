@@ -80,6 +80,7 @@ public class GameScreen implements Screen {
 
     public int movimientosIA = 0;
     public float temporizadorIA = 0f;
+    public int ultimaFilaGenerada = 5;
 
     public float tiempoReloj = 0f;
 
@@ -237,10 +238,9 @@ public class GameScreen implements Screen {
                 // Lógica de Reloj / Contrarreloj / Velocidad
                 if (tiempoReloj > 0) {
                     tiempoReloj -= delta;
-                    scrollSpeed = (10f + (filaMaximaAlcanzada * 0.25f)) * 0.4f; // Cámara lenta (60% más lento)
-                    // No restamos 'tiempoRestante', por lo que el reloj de la partida se congela
+                    scrollSpeed = (10f + (filaMaximaAlcanzada * 0.25f)) * 0.4f; // Efecto cámara lenta
                 } else {
-                    scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f);
+                    scrollSpeed = 10f + (filaMaximaAlcanzada * 0.25f); // Velocidad normal que aumenta al subir
                     if (modoActual == ModoJuego.CONTRARRELOJ) {
                         tiempoRestante -= delta;
                         if (tiempoRestante <= 0) {
@@ -249,7 +249,35 @@ public class GameScreen implements Screen {
                         }
                     }
                 }
-                scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
+
+                // --- DIVISIÓN DE MODOS DE CÁMARA ---
+
+                if (modoActual == ModoJuego.INFINITO) {
+                    // Infinito: La cámara te empuja y te mata si te quedas atrás
+                    if (filaMaximaAlcanzada > 0) {
+                        float presionSpeed = 25f + (filaMaximaAlcanzada * 0.8f);
+                        if (tiempoReloj > 0) presionSpeed *= 0.4f;
+                        camaraAutoY += presionSpeed * delta;
+                    }
+
+                    if (targetScrollY > camaraAutoY) {
+                        camaraAutoY += (targetScrollY - camaraAutoY) * scrollSpeed * delta;
+                    }
+                    scrollY = camaraAutoY;
+
+                    // Validar si el jugador fue tragado por la pantalla
+                    float pyJugadorCalculado = (filaLogicaJugador * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
+                    if (pyJugadorCalculado < -CELL_H && estadoActual == EstadoJuego.JUGANDO) {
+                        dispararGameOver("¡TE ALCANZÓ EL TABLERO!");
+                    }
+
+                } else {
+                    // Todos los demas: Movimiento relajado
+                    // La cámara solo sube si tú subes.
+                    scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
+                    camaraAutoY = scrollY; // Sincronizamos por precaución
+                }
+
                 tiempoJugado += delta;
             } else if (estadoActual == EstadoJuego.GAME_OVER) {
                 if (Gdx.input.justTouched()) {
@@ -283,7 +311,7 @@ public class GameScreen implements Screen {
         }
         //sombras
         int filaEnBase = (int) (scrollY / CELL_H);
-        Texture sombraActual = (filaEnBase % 2 == 0) ? SombraB : SombraA;
+        Texture sombraActual = (filaEnBase % 2 == 0) ? SombraA : SombraB;
         float scaleSombra = WORLD_WIDTH / sombraActual.getWidth();
         float altoSombraEscalada = sombraActual.getHeight() * scaleSombra;
         juego.batch.draw(sombraActual, 0, 0, WORLD_WIDTH, altoSombraEscalada);
@@ -378,6 +406,23 @@ public class GameScreen implements Screen {
         // Siempre se dibuja para mostrar el HUD en juego y el menú cuando se pausa
         uiStage.act(delta);
         uiStage.draw();
+
+        // 5. SISTEMA DE GENERACIÓN CONTINUA E INFINITA
+        // Averiguamos cuál es la fila más alta que está viendo la cámara ahora mismo
+        int filaSuperiorPantalla = (int) ((scrollY + WORLD_HEIGHT) / CELL_H);
+
+        // Queremos tener siempre generadas 2 filas por encima de lo que se ve en la pantalla
+        // Pero si el jugador va rapidísimo, generamos 8 filas por delante de él.
+        int filaObjetivo = Math.max(filaLogicaJugador + 8, filaSuperiorPantalla + 2);
+
+        while (ultimaFilaGenerada < filaObjetivo) {
+            ultimaFilaGenerada++;
+            TipoPieza piezaActual = (movimientosCambio > 0) ? piezaTransformada : null;
+
+            // Le pedimos al gestor que cree la fila específica
+            gestorEnemigos.generarFilaDeEnemigos(ultimaFilaGenerada, jugadorCol, filaLogicaJugador, modoActual, nivelActual, piezaActual);
+            gestorEnemigos.intentarGenerarPowerUp(ultimaFilaGenerada);
+        }
     }
 
     private void handleInput() {
@@ -387,7 +432,7 @@ public class GameScreen implements Screen {
 
             if (Gdx.input.justTouched()) {
                 float px = jugadorCol * CELL_W;
-                float py = JUGADOR_FILA_VIS * CELL_H;
+                float py = (filaLogicaJugador * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
 
                 if (touchPoint.x >= px && touchPoint.x <= px + CELL_W &&
                     touchPoint.y >= py && touchPoint.y <= py + CELL_H) {
@@ -405,19 +450,22 @@ public class GameScreen implements Screen {
                 isDragging = false;
 
                 int targetCol = (int) (touchPoint.x / CELL_W);
-                int targetVisualRow = (int) (touchPoint.y / CELL_H);
+
+                float yRealTablero = touchPoint.y + scrollY - (JUGADOR_FILA_VIS * CELL_H);
+                int nuevaFilaLogica = (int) (yRealTablero / CELL_H);
+                if (yRealTablero < 0) nuevaFilaLogica -= 1; // Previene un bug con números negativos
 
                 int diffCol = targetCol - jugadorCol;
-                int diffRow = targetVisualRow - JUGADOR_FILA_VIS;
-                int nuevaFilaLogica = filaLogicaJugador + diffRow;
+                int diffRow = nuevaFilaLogica - filaLogicaJugador;
 
+                // El jugador solo puede volver 1 casilla atrás (Lógica intacta)
                 int limiteInferior = Math.max(0, filaMaximaAlcanzada - 1);
                 boolean retrocesoValido = nuevaFilaLogica >= limiteInferior;
 
                 boolean movimientoValido = false;
                 boolean caminoLibreJugador = true;
 
-                // Lógica del CAMBIO (Permite teletransportarse al destino si cumple las reglas de la pieza)
+                // Lógica del CAMBIO
                 if (movimientosCambio > 0) {
                     movimientoValido = switch (piezaTransformada) {
                         case TORRE -> (diffCol == 0 || diffRow == 0) && retrocesoValido;
@@ -430,7 +478,6 @@ public class GameScreen implements Screen {
                             Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;
                     };
                 } else {
-                    // Reglas base del Rey
                     movimientoValido = Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;
                 }
 
@@ -440,7 +487,6 @@ public class GameScreen implements Screen {
                     }
                 }
 
-                // Agregamos caminoLibreJugador a la condición final
                 if (targetCol >= 0 && targetCol < COLS && (diffCol != 0 || diffRow != 0) && movimientoValido && caminoLibreJugador) {
                     if (movimientosCambio > 0) movimientosCambio--;
 
@@ -451,9 +497,9 @@ public class GameScreen implements Screen {
                         filaMaximaAlcanzada = filaLogicaJugador;
                     }
 
-                    targetScrollY = filaLogicaJugador * CELL_H;
-                    gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
+                    targetScrollY = filaMaximaAlcanzada * CELL_H;
 
+                    gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
                     recolectarPowerUpsLocal();
 
                     if (gestorEnemigos.estaCasillaAmenazada(jugadorCol, filaLogicaJugador)) {
@@ -463,17 +509,15 @@ public class GameScreen implements Screen {
                         } else {
                             dispararGameOver("¡JAQUE MATE!");
                         }
-                    } else {
+                    } /*else {
                         if (diffRow > 0) {
                             TipoPieza piezaActual = (movimientosCambio > 0) ? piezaTransformada : null;
                             gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual, piezaActual);
-                            gestorEnemigos.intentarGenerarPowerUp(filaLogicaJugador);
                         }
-                    }
+                    }*/
 
                     gestorEnemigos.limpiarObjetosPasados((int) (scrollY / CELL_H));
                     if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) estadoActual = EstadoJuego.VICTORIA;
-
                 }
             }
         }
@@ -512,6 +556,7 @@ public class GameScreen implements Screen {
     private void reiniciarJuego() {
         scrollY = 0f;
         targetScrollY = 0f;
+        camaraAutoY = 0f;
         filaLogicaJugador = 0;
         filaMaximaAlcanzada = 0;
         jugadorCol = 2;
@@ -523,6 +568,9 @@ public class GameScreen implements Screen {
         movimientosIA = 0;
         temporizadorIA = 0f;
         tiempoReloj = 0f;
+        isDragging = false;
+        ultimaFilaGenerada = 5;
+
 
         if (modoActual == ModoJuego.CONTRARRELOJ) {
             tiempoRestante = 60f;
@@ -617,12 +665,11 @@ public class GameScreen implements Screen {
         // Si está completamente acorralado, avanza de frente para sacrificar el escudo o morir
         if (!movio) mejorFila = filaLogicaJugador + 1;
 
-        int diffRow = mejorFila - filaLogicaJugador;
         jugadorCol = mejorCol;
         filaLogicaJugador = mejorFila;
 
         if (filaLogicaJugador > filaMaximaAlcanzada) filaMaximaAlcanzada = filaLogicaJugador;
-        targetScrollY = filaLogicaJugador * CELL_H;
+        targetScrollY = filaMaximaAlcanzada * CELL_H;
 
         gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
         recolectarPowerUpsLocal();
@@ -635,13 +682,13 @@ public class GameScreen implements Screen {
                 dispararGameOver("¡JAQUE MATE!");
                 movimientosIA = 0; // Abortar IA
             }
-        } else {
+        } /*else {
             if (diffRow > 0) {
                 TipoPieza piezaActual = (movimientosCambio > 0) ? piezaTransformada : null;
                 gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual, piezaActual);
                 gestorEnemigos.intentarGenerarPowerUp(filaLogicaJugador);
             }
-        }
+        }*/
 
         gestorEnemigos.limpiarObjetosPasados((int) (scrollY / CELL_H));
         if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) estadoActual = EstadoJuego.VICTORIA;

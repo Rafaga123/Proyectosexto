@@ -57,7 +57,7 @@ public class MainMenuScreen implements Screen {
         String aliasMostrar = (usuario != null) ? usuario.getAlias() : "Desconocido";
 
         // Creamos los elementos visuales
-        Label tituloLabel = new Label("CHESS RUNNER", skin);
+        Label tituloLabel = new Label("CHESS RUNNER BETA", skin);
         tituloLabel.setFontScale(2.0f);
         Label userLabel = new Label("Jugador: " + aliasMostrar, skin);
 

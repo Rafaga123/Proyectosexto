@@ -23,6 +23,7 @@ public class SelectModeDialog extends Dialog {
         content.pad(20);
 
         // --- 1. CREACIÓN DE LOS BOTONES ---
+        TextButton btnClasico = new TextButton("Clasico (Sin presion)", skin);
         TextButton btnSupervivencia = new TextButton("Supervivencia (Infinito)", skin);
         TextButton btnContrarreloj = new TextButton("Contrarreloj", skin);
 
@@ -34,11 +35,20 @@ public class SelectModeDialog extends Dialog {
         TextButton btnCerrar = new TextButton("Volver", skin);
 
         // --- 2. LÓGICA DE CONEXIÓN CON GAMESCREEN ---
+        // Modo Clasico
+        btnClasico.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                game.setScreen(new GameScreen(game, ModoJuego.CLASICO, 0));
+                hide();
+            }
+        });
+
         // Modo Supervivencia
         btnSupervivencia.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                // Pasamos ModoJuego.INFINITO y el nivel 0 porque no aplica
+                // Mantenemos INFINITO según la nomenclatura que venías usando
                 game.setScreen(new GameScreen(game, ModoJuego.INFINITO, 0));
                 hide();
             }
@@ -80,6 +90,7 @@ public class SelectModeDialog extends Dialog {
 
         // --- LAYOUT de la seleccion ---
         // Ponemos los botones principales arriba
+        content.add(btnClasico).width(260).height(45).padBottom(10).colspan(3).row();
         content.add(btnSupervivencia).width(260).height(45).padBottom(10).colspan(3).row();
         content.add(btnContrarreloj).width(260).height(45).padBottom(20).colspan(3).row();
 

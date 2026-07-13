@@ -21,6 +21,8 @@ public class GestorEnemigos {
     public boolean estaCasillaAmenazada(int col, int fila) {
         for (int i = 0; i < activos.size; i++) {
             Enemigo e = activos.get(i);
+
+            if (Math.abs(e.filLogica - fila) > 7) continue;
             // El ataque solo es válido si la línea de visión está limpia
             if (e.atacaCasilla(col, fila) && !caminoBloqueado(e, col, fila)) {
                 return true;
@@ -34,6 +36,8 @@ public class GestorEnemigos {
         for (int i = 0; i < activos.size; i++) {
             Enemigo e = activos.get(i);
             if (e.colLogica == col && e.filLogica == fila) continue;
+
+            if (Math.abs(e.filLogica - fila) > 7) continue;
             if (e.atacaCasilla(col, fila) && !caminoBloqueado(e, col, fila)) {
                 return true;
             }
@@ -93,24 +97,24 @@ public class GestorEnemigos {
     }
 
     // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
-    public void intentarGenerarEnemigos(int filaJugador, int colJugador, ModoJuego modo, int nivel, TipoPieza piezaJugador) {
-        if (activos.size >= 10) return;
+    public void generarFilaDeEnemigos(int filaAparicion, int colJugador, int filaJugador, ModoJuego modo, int nivel, TipoPieza piezaJugador) {
+        if (activos.size >= 15) return;
 
-        // Intentar generar un power-up en la misma franja de avance
-        intentarGenerarPowerUp(filaJugador);
-
-        int filaAparicion = filaJugador + 6;
         for (int i = 0; i < 2; i++) {
-            if (MathUtils.randomBoolean(0.5f)) {
+            if (MathUtils.randomBoolean(0.4f)) {
                 int colAleatoria = MathUtils.random(0, 4);
                 TipoPieza tipoElegido = obtenerPiezaAleatoria(modo, nivel);
 
-                // NUEVA CONDICIÓN: Exigimos que la casilla esté vacía de enemigos Y de Power-Ups
                 if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion) && !hayPowerUpEnCasilla(colAleatoria, filaAparicion)) {
                     Enemigo nuevoEnemigo = new Enemigo(tipoElegido, colAleatoria, filaAparicion);
+
+                    // Si la pieza generada amenaza al jugador en el mismo instante en que nace, la descartamos.
+                    if (nuevoEnemigo.atacaCasilla(colJugador, filaJugador) && !caminoBloqueado(nuevoEnemigo, colJugador, filaJugador)) {
+                        continue; // Saltamos a la siguiente iteración sin agregar la pieza
+                    }
+
                     activos.add(nuevoEnemigo);
 
-                    // Pasamos la transformación actual del jugador para calcular escapes
                     if (!existeCaminoSeguro(colJugador, filaJugador, filaAparicion, piezaJugador)) {
                         activos.removeValue(nuevoEnemigo, true);
                     }
@@ -176,13 +180,10 @@ public class GestorEnemigos {
     }
 
     // Metodo para generar power-ups aleatoriamente
-    public void intentarGenerarPowerUp(int filaJugador) {
-        // Probabilidad baja (ej. 5%) de generar un power-up en una fila lejana
+    public void intentarGenerarPowerUp(int filaAparicion) {
         if (MathUtils.randomBoolean(0.05f)) {
-            int filaAparicion = filaJugador + 8;
             int colAleatoria = MathUtils.random(0, 4);
 
-            // CÓDIGO LIMPIO: Usamos ambos escáneres
             if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion) && !hayPowerUpEnCasilla(colAleatoria, filaAparicion)) {
                 TipoPowerUp tipo = TipoPowerUp.values()[MathUtils.random(TipoPowerUp.values().length - 1)];
                 powerUpsActivos.add(new PowerUp(tipo, colAleatoria, filaAparicion));
@@ -257,7 +258,7 @@ public class GestorEnemigos {
             }
         }
 
-        // Para el modo Infinito o Contrarreloj, vamos a usar la distribución normal (o sea todo normalito)
+        // Para el modo CLASICO, Infinito o Contrarreloj, usamos la distribución estándar
         int tirada = MathUtils.random(1, 100);
         if (tirada <= 45) return TipoPieza.PEON;
         if (tirada <= 70) return TipoPieza.CABALLO;

@@ -55,6 +55,8 @@ public class GameScreen implements Screen {
     Texture texturaPiezasNegras;
     Texture texturaPiezasBlancas;
     ObjectMap<TipoPieza, TextureRegion> regionesEnemigos;
+    ObjectMap<TipoPieza, TextureRegion> regionesJugador;
+    float camaraAutoY = 0f;
 
     static final float WORLD_WIDTH  = 480f;
     static final float WORLD_HEIGHT = 800f;
@@ -247,7 +249,6 @@ public class GameScreen implements Screen {
                         }
                     }
                 }
-
                 scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
                 tiempoJugado += delta;
             } else if (estadoActual == EstadoJuego.GAME_OVER) {
@@ -269,6 +270,8 @@ public class GameScreen implements Screen {
 
         juego.batch.begin();
 
+
+        // Tablero
         float scale = WORLD_WIDTH / texturaTablero.getWidth();
         float scaledHeight = texturaTablero.getHeight() * scale;
         float offsetY = scrollY % scaledHeight;
@@ -278,13 +281,13 @@ public class GameScreen implements Screen {
             juego.batch.draw(texturaTablero, 0, drawY, WORLD_WIDTH, scaledHeight);
             drawY += scaledHeight;
         }
-
+        //sombras
         int filaEnBase = (int) (scrollY / CELL_H);
         Texture sombraActual = (filaEnBase % 2 == 0) ? SombraB : SombraA;
         float scaleSombra = WORLD_WIDTH / sombraActual.getWidth();
         float altoSombraEscalada = sombraActual.getHeight() * scaleSombra;
         juego.batch.draw(sombraActual, 0, 0, WORLD_WIDTH, altoSombraEscalada);
-
+        //enemigos
         for (Enemigo e : gestorEnemigos.activos) {
             float px = e.colLogica * CELL_W;
             float py = (e.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
@@ -297,15 +300,7 @@ public class GameScreen implements Screen {
             }
         }
 
-        if (isDragging) {
-            juego.batch.draw(piezaRey, dragX, dragY, CELL_W, CELL_H);
-        } else {
-            float px = jugadorCol * CELL_W;
-            float py = JUGADOR_FILA_VIS * CELL_H;
-            juego.batch.draw(piezaRey, px, py, CELL_W, CELL_H);
-        }
-
-        // --- DIBUJADO DE LA INTERFAZ DE USUARIO (TEXTOS) ---
+        // Textos de interfaz
         if (estadoActual == EstadoJuego.JUGANDO) {
             if (modoActual == ModoJuego.TUTORIAL) {
                 font.draw(juego.batch, "Tutorial " + nivelActual + " - Meta: " + filaMeta, 20, WORLD_HEIGHT - 20);
@@ -343,7 +338,7 @@ public class GameScreen implements Screen {
 
             font.getData().setScale(2f);
         }
-        // Dibujar cajas de Power-Ups
+        // Power-ups
         for (PowerUp p : gestorEnemigos.powerUpsActivos) {
             float px = p.colLogica * CELL_W;
             float py = (p.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
@@ -360,16 +355,17 @@ public class GameScreen implements Screen {
                 juego.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
             }
         }
-
         // Definir qué textura usar para el jugador (Rey o Transformación)
-        TextureRegion regionDibujo = (movimientosCambio > 0 && piezaTransformada != null) ? regionesEnemigos.get(piezaTransformada) : piezaRey;
+        TextureRegion regionDibujo = (movimientosCambio > 0 && piezaTransformada != null)
+            ? regionesJugador.get(piezaTransformada)
+            : piezaRey;
 
         float pxJugador = isDragging ? dragX : (jugadorCol * CELL_W);
-        float pyJugador = isDragging ? dragY : (JUGADOR_FILA_VIS * CELL_H);
+        float pyJugador = isDragging ? dragY : ((filaLogicaJugador * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H));
 
         juego.batch.draw(regionDibujo, pxJugador, pyJugador, CELL_W, CELL_H);
 
-        // Dibujar aura de Escudo si está activo
+        // Aura de escudo
         if (tieneEscudo) {
             juego.batch.setColor(0, 0, 1, 0.4f);
             juego.batch.draw(texturaPixelBlanco, jugadorCol * CELL_W, JUGADOR_FILA_VIS * CELL_H, CELL_W, CELL_H);
@@ -419,6 +415,7 @@ public class GameScreen implements Screen {
                 boolean retrocesoValido = nuevaFilaLogica >= limiteInferior;
 
                 boolean movimientoValido = false;
+                boolean caminoLibreJugador = true;
 
                 // Lógica del CAMBIO (Permite teletransportarse al destino si cumple las reglas de la pieza)
                 if (movimientosCambio > 0) {
@@ -437,8 +434,14 @@ public class GameScreen implements Screen {
                     movimientoValido = Math.abs(diffCol) <= 1 && Math.abs(diffRow) <= 1 && retrocesoValido;
                 }
 
-                if (targetCol >= 0 && targetCol < COLS && (diffCol != 0 || diffRow != 0) && movimientoValido) {
+                if (movimientoValido && movimientosCambio > 0 && piezaTransformada != TipoPieza.CABALLO && (diffCol != 0 || diffRow != 0)) {
+                    if (caminoBloqueadoJugador(piezaTransformada, jugadorCol, filaLogicaJugador, targetCol, nuevaFilaLogica)) {
+                        caminoLibreJugador = false;
+                    }
+                }
 
+                // Agregamos caminoLibreJugador a la condición final
+                if (targetCol >= 0 && targetCol < COLS && (diffCol != 0 || diffRow != 0) && movimientoValido && caminoLibreJugador) {
                     if (movimientosCambio > 0) movimientosCambio--;
 
                     jugadorCol = targetCol;
@@ -462,7 +465,8 @@ public class GameScreen implements Screen {
                         }
                     } else {
                         if (diffRow > 0) {
-                            gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
+                            TipoPieza piezaActual = (movimientosCambio > 0) ? piezaTransformada : null;
+                            gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual, piezaActual);
                             gestorEnemigos.intentarGenerarPowerUp(filaLogicaJugador);
                         }
                     }
@@ -473,6 +477,24 @@ public class GameScreen implements Screen {
                 }
             }
         }
+    }
+
+    public boolean caminoBloqueadoJugador(TipoPieza pieza, int c1, int f1, int c2, int f2) {
+        if (pieza == TipoPieza.CABALLO || pieza == null) return false;
+
+        int dCol = Integer.signum(c2 - c1);
+        int dRow = Integer.signum(f2 - f1);
+        int cc = c1 + dCol;
+        int rr = f1 + dRow;
+
+        while (cc != c2 || rr != f2) {
+            if (gestorEnemigos.hayEnemigoEnCasilla(cc, rr)) {
+                return true;
+            }
+            cc += dCol;
+            rr += dRow;
+        }
+        return false;
     }
 
     @Override
@@ -494,6 +516,13 @@ public class GameScreen implements Screen {
         filaMaximaAlcanzada = 0;
         jugadorCol = 2;
         tiempoJugado = 0f;
+        tieneEscudo = false;
+        tiempoEscudo = 0f;
+        movimientosCambio = 0;
+        piezaTransformada = null;
+        movimientosIA = 0;
+        temporizadorIA = 0f;
+        tiempoReloj = 0f;
 
         if (modoActual == ModoJuego.CONTRARRELOJ) {
             tiempoRestante = 60f;
@@ -608,7 +637,8 @@ public class GameScreen implements Screen {
             }
         } else {
             if (diffRow > 0) {
-                gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual);
+                TipoPieza piezaActual = (movimientosCambio > 0) ? piezaTransformada : null;
+                gestorEnemigos.intentarGenerarEnemigos(filaLogicaJugador, jugadorCol, modoActual, nivelActual, piezaActual);
                 gestorEnemigos.intentarGenerarPowerUp(filaLogicaJugador);
             }
         }
@@ -664,11 +694,20 @@ public class GameScreen implements Screen {
         TextureRegion[][] matrizEnemigos = TextureRegion.split(texturaFuente, anchoPieza, altoPieza);
         TextureRegion[][] matrizJugador = TextureRegion.split(texturaJugador, anchoPieza, altoPieza);
 
+        regionesEnemigos = new ObjectMap<>();
+        regionesJugador = new ObjectMap<>();
+
         regionesEnemigos.put(TipoPieza.PEON, matrizEnemigos[1][2]);
         regionesEnemigos.put(TipoPieza.TORRE, matrizEnemigos[1][0]);
         regionesEnemigos.put(TipoPieza.CABALLO, matrizEnemigos[0][1]);
         regionesEnemigos.put(TipoPieza.ALFIL, matrizEnemigos[1][1]);
         regionesEnemigos.put(TipoPieza.REINA, matrizEnemigos[0][2]);
+
+        regionesJugador.put(TipoPieza.PEON, matrizJugador[1][2]);
+        regionesJugador.put(TipoPieza.TORRE, matrizJugador[1][0]);
+        regionesJugador.put(TipoPieza.CABALLO, matrizJugador[0][1]);
+        regionesJugador.put(TipoPieza.ALFIL, matrizJugador[1][1]);
+        regionesJugador.put(TipoPieza.REINA, matrizJugador[0][2]);
 
         piezaRey = matrizJugador[0][0];
     }

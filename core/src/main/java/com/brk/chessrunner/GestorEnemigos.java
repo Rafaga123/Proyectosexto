@@ -19,22 +19,22 @@ public class GestorEnemigos {
 
     // El escáner principal de la muerte
     public boolean estaCasillaAmenazada(int col, int fila) {
-        for (Enemigo e : activos) {
-            if (e.atacaCasilla(col, fila)) {
-                return true; // Basta con que UNO ataque la casilla para morir
+        for (int i = 0; i < activos.size; i++) {
+            Enemigo e = activos.get(i);
+            // El ataque solo es válido si la línea de visión está limpia
+            if (e.atacaCasilla(col, fila) && !caminoBloqueado(e, col, fila)) {
+                return true;
             }
         }
-        return false; // Si revisa todos y ninguno ataca, el jugador a salvo
+        return false;
     }
 
     // verifica si podemos capturar una pieza de forma segura
     public boolean estaCasillaDefendida(int col, int fila) {
-        for (Enemigo e : activos) {
-            // Si el enemigo está en la casilla exacta a la que nos queremos mover, lo IGNORAMOS
+        for (int i = 0; i < activos.size; i++) {
+            Enemigo e = activos.get(i);
             if (e.colLogica == col && e.filLogica == fila) continue;
-
-            // Si cualquier OTRO enemigo tiene esta casilla en su línea de ataque, es suicidio ir
-            if (e.atacaCasilla(col, fila)) {
+            if (e.atacaCasilla(col, fila) && !caminoBloqueado(e, col, fila)) {
                 return true;
             }
         }
@@ -92,95 +92,86 @@ public class GestorEnemigos {
         powerUpsActivos.clear();
     }
 
-    // Algoritmo de Búsqueda en Anchura (BFS) para garantizar que el nivel es pasable
-    private boolean existeCaminoSeguro(int colInicio, int filaInicio, int filaMeta) {
-        // Calculo de cuántas filas hay de diferencia para dimensionar nuestro mapa de visitados
+    // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
+    public void intentarGenerarEnemigos(int filaJugador, int colJugador, ModoJuego modo, int nivel, TipoPieza piezaJugador) {
+        if (activos.size >= 10) return;
+
+        // Intentar generar un power-up en la misma franja de avance
+        intentarGenerarPowerUp(filaJugador);
+
+        int filaAparicion = filaJugador + 6;
+        for (int i = 0; i < 2; i++) {
+            if (MathUtils.randomBoolean(0.5f)) {
+                int colAleatoria = MathUtils.random(0, 4);
+                TipoPieza tipoElegido = obtenerPiezaAleatoria(modo, nivel);
+
+                // NUEVA CONDICIÓN: Exigimos que la casilla esté vacía de enemigos Y de Power-Ups
+                if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion) && !hayPowerUpEnCasilla(colAleatoria, filaAparicion)) {
+                    Enemigo nuevoEnemigo = new Enemigo(tipoElegido, colAleatoria, filaAparicion);
+                    activos.add(nuevoEnemigo);
+
+                    // Pasamos la transformación actual del jugador para calcular escapes
+                    if (!existeCaminoSeguro(colJugador, filaJugador, filaAparicion, piezaJugador)) {
+                        activos.removeValue(nuevoEnemigo, true);
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean existeCaminoSeguro(int colInicio, int filaInicio, int filaMeta, TipoPieza piezaJugador) {
         int filasDeDistancia = (filaMeta - filaInicio) + 1;
         if (filasDeDistancia <= 0) return true;
 
         boolean[][] visitado = new boolean[5][filasDeDistancia];
         Array<int[]> cola = new Array<>();
 
-        // Empezamos desde la posición actual del jugador
         cola.add(new int[]{colInicio, filaInicio});
         visitado[colInicio][0] = true;
-
-        // Posibles movimientos del Rey que nos hacen avanzar o esquivar (Se excluye calcular hacia atrás para optimizar)
-        int[][] movimientos = {
-            {0, 1}, {-1, 1}, {1, 1}, // Avanzar recto, diagonal izq, diagonal der
-            {-1, 0}, {1, 0}          // Esquivar lateral izq, lateral der
-        };
 
         while (cola.size > 0) {
             int[] actual = cola.removeIndex(0);
             int c = actual[0];
             int f = actual[1];
 
-            // Si un camino logró llegar a la fila donde queremos poner la pieza nueva, el nivel es pasable
-            if (f >= filaMeta) {
-                return true;
-            }
+            if (f >= filaMeta) return true;
 
-            for (int[] mov : movimientos) {
-                int nuevaCol = c + mov[0];
-                int nuevaFila = f + mov[1];
+            // Escanea TODO el tablero frente al jugador evaluando saltos dinámicos
+            for (int nuevaCol = 0; nuevaCol < 5; nuevaCol++) {
+                for (int nuevaFila = f; nuevaFila <= Math.min(f + 6, filaMeta); nuevaFila++) {
+                    if (nuevaCol == c && nuevaFila == f) continue;
 
-                // Verificamos que no se salga de los límites del tablero (0 a 4) y no pase de la meta
-                if (nuevaCol >= 0 && nuevaCol < 5 && nuevaFila <= filaMeta) {
-                    int indiceFilaMatriz = nuevaFila - filaInicio;
-
-                    // Si la fila está dentro del rango y no la hemos evaluado aún
-                    if (indiceFilaMatriz >= 0 && indiceFilaMatriz < filasDeDistancia && !visitado[nuevaCol][indiceFilaMatriz]) {
-
-                        // REGLA CLAVE: La casilla es transitable si no está amenazada por un defensor.
-                        // Esto permite al BFS considerar caminos donde el jugador captura una pieza siempre y cuando esa pieza no esté protegida por otra
-                        if (!estaCasillaDefendida(nuevaCol, nuevaFila)) {
-                            visitado[nuevaCol][indiceFilaMatriz] = true;
-                            cola.add(new int[]{nuevaCol, nuevaFila});
+                    if (esMovimientoValidoParaBFS(piezaJugador, c, f, nuevaCol, nuevaFila)) {
+                        if (!caminoBloqueadoJugador(piezaJugador, c, f, nuevaCol, nuevaFila)) {
+                            int indiceFilaMatriz = nuevaFila - filaInicio;
+                            if (indiceFilaMatriz >= 0 && indiceFilaMatriz < filasDeDistancia && !visitado[nuevaCol][indiceFilaMatriz]) {
+                                if (!estaCasillaDefendida(nuevaCol, nuevaFila)) {
+                                    visitado[nuevaCol][indiceFilaMatriz] = true;
+                                    cola.add(new int[]{nuevaCol, nuevaFila});
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-
-        // Si la cola se vacía y nunca llegamos a la fila meta, significa que es un bloqueo imposible
         return false;
     }
 
-    // Metodo para generar enemigos automaticamente segun el jugador avanza (Hay que mejorarlo para calcular que sea posible el camino)
-    public void intentarGenerarEnemigos(int filaJugador, int colJugador, ModoJuego modo, int nivel) {
-        if (activos.size >= 10) {
-            return;
-        }
+    private boolean esMovimientoValidoParaBFS(TipoPieza pieza, int c1, int f1, int c2, int f2) {
+        int difCol = Math.abs(c2 - c1);
+        int difFila = Math.abs(f2 - f1);
+        if (difFila > 6) return false;
 
-        // Intentar generar un power-up en la misma franja de avance
-        intentarGenerarPowerUp(filaJugador);
+        if (pieza == null) return difCol <= 1 && difFila <= 1; // REY
 
-        int filaAparicion = filaJugador + 6;
-
-        // Bajamos a 2 intentos por fila para dar más espacio orgánico
-        int intentosDeGeneracion = 2;
-
-        for (int i = 0; i < intentosDeGeneracion; i++) {
-            // 50% de probabilidad base por cada intento de colocar una pieza
-            if (MathUtils.randomBoolean(0.5f)) {
-                int colAleatoria = MathUtils.random(0, 4);
-
-                // Pasamos el modo y nivel al sistema de pesos
-                TipoPieza tipoElegido = obtenerPiezaAleatoria(modo, nivel);
-
-                if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
-                    Enemigo nuevoEnemigo = new Enemigo(tipoElegido, colAleatoria, filaAparicion);
-                    activos.add(nuevoEnemigo);
-
-                    boolean esPasable = existeCaminoSeguro(colJugador, filaJugador, filaAparicion);
-
-                    if (!esPasable) {
-                        activos.removeValue(nuevoEnemigo, true);
-                        System.out.println("Generación vetada: El " + tipoElegido + " bloqueaba todos los caminos.");
-                    }
-                }
-            }
+        switch (pieza) {
+            case PEON: return difCol <= 1 && difFila == 1;
+            case TORRE: return difCol == 0 || difFila == 0;
+            case ALFIL: return difCol == difFila;
+            case CABALLO: return (difCol == 1 && difFila == 2) || (difCol == 2 && difFila == 1);
+            case REINA: return difCol == 0 || difFila == 0 || difCol == difFila;
+            default: return difCol <= 1 && difFila <= 1;
         }
     }
 
@@ -191,24 +182,60 @@ public class GestorEnemigos {
             int filaAparicion = filaJugador + 8;
             int colAleatoria = MathUtils.random(0, 4);
 
-            // Solo generar si la casilla está vacía de enemigos y otros power-ups
-            if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion)) {
-                for (PowerUp p : powerUpsActivos) {
-                    if (p.colLogica == colAleatoria && p.filLogica == filaAparicion) return;
-                }
-
+            // CÓDIGO LIMPIO: Usamos ambos escáneres
+            if (!hayEnemigoEnCasilla(colAleatoria, filaAparicion) && !hayPowerUpEnCasilla(colAleatoria, filaAparicion)) {
                 TipoPowerUp tipo = TipoPowerUp.values()[MathUtils.random(TipoPowerUp.values().length - 1)];
                 powerUpsActivos.add(new PowerUp(tipo, colAleatoria, filaAparicion));
             }
         }
     }
+    // Metodo público auxiliar para buscar enemigos por coordenadas
+    public boolean hayEnemigoEnCasilla(int col, int fila) {
+        for (int i = 0; i < activos.size; i++) {
+            Enemigo e = activos.get(i);
+            if (e.colLogica == col && e.filLogica == fila) return true;
+        }
+        return false;
+    }
 
-    // Metodo para verificar si una casilla ya esta ocupada
-    private boolean hayEnemigoEnCasilla(int col, int fila) {
-        for (Enemigo e : activos) {
-            if (e.colLogica == col && e.filLogica == fila) {
-                return true;
-            }
+    // Metodo para buscar power-ups por coordenadas
+    public boolean hayPowerUpEnCasilla(int col, int fila) {
+        for (int i = 0; i < powerUpsActivos.size; i++) {
+            PowerUp p = powerUpsActivos.get(i);
+            if (p.colLogica == col && p.filLogica == fila) return true;
+        }
+        return false;
+    }
+
+    // Calcula si una pieza enemiga está bloqueada por otro cuerpo
+    private boolean caminoBloqueado(Enemigo atacante, int targetCol, int targetFila) {
+        if (atacante.tipo == TipoPieza.CABALLO) return false; // El caballo salta
+
+        int dirCol = Integer.signum(targetCol - atacante.colLogica);
+        int dirFila = Integer.signum(targetFila - atacante.filLogica);
+
+        int actualCol = atacante.colLogica + dirCol;
+        int actualFila = atacante.filLogica + dirFila;
+
+        while (actualCol != targetCol || actualFila != targetFila) {
+            if (hayEnemigoEnCasilla(actualCol, actualFila)) return true;
+            actualCol += dirCol;
+            actualFila += dirFila;
+        }
+        return false;
+    }
+
+    // Calcula si el JUGADOR está bloqueado al usar un Power-Up de larga distancia
+    private boolean caminoBloqueadoJugador(TipoPieza pieza, int c1, int f1, int c2, int f2) {
+        if (pieza == null || pieza == TipoPieza.CABALLO) return false;
+        int dirCol = Integer.signum(c2 - c1);
+        int dirFila = Integer.signum(f2 - f1);
+        int ac = c1 + dirCol;
+        int af = f1 + dirFila;
+        while(ac != c2 || af != f2) {
+            if (hayEnemigoEnCasilla(ac, af)) return true;
+            ac += dirCol;
+            af += dirFila;
         }
         return false;
     }

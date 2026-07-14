@@ -80,7 +80,7 @@ public class ConfigMenu extends Dialog {
         btnSalir.addListener(new ClickListener(){
            @Override
            public void clicked(InputEvent event, float x, float y) {
-               
+
                // Guardamos las preferencias de audio al salir
                prefs.putFloat("musicVolume", musicSlider.getValue());
                prefs.putFloat("fxVolume", fxSlider.getValue());

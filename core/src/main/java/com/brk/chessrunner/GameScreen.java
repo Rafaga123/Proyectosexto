@@ -3,6 +3,7 @@ package com.brk.chessrunner;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -13,6 +14,12 @@ import com.badlogic.gdx.utils.ObjectMap;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack;
 import com.brk.chessrunner.database.PartidaLocal;
 import com.brk.chessrunner.database.UsuarioLocal;
 import com.brk.chessrunner.ui.PauseWidget;
@@ -96,6 +103,11 @@ public class GameScreen implements Screen {
     private boolean juegoPausado = false;
     private float tiempoJugado = 0f;
 
+    private SpriteBatch batch;
+    private ShaderProgram shaderFondo;
+    private float tiempoGlobal =0f;
+    private Texture texturaBlanca;
+
 
     // El constructor recibe el juego principal
     public GameScreen(MainGame juego, ModoJuego modoActual, int nivel) {
@@ -116,6 +128,23 @@ public class GameScreen implements Screen {
 
     @Override
     public void show() {
+
+        batch = new SpriteBatch();
+
+        // Creamos una textura blanca genérica para que el shader tenga un lienzo donde pintar
+        texturaBlanca = new Texture("ui/default.png"); // Puedes usar la textura por defecto de tu uiskin
+
+        // Cargamos el shader
+        ShaderProgram.pedantic = false; // Importante para que no de errores si no usas todas las variables
+        shaderFondo = new ShaderProgram(
+            Gdx.files.internal("shaders/fondo.vert"),
+            Gdx.files.internal("shaders/fondo.frag")
+        );
+
+        if (!shaderFondo.isCompiled()) {
+            Gdx.app.error("Shader Error", shaderFondo.getLog());
+        }
+
         touchPoint = new Vector3();
         font = new com.badlogic.gdx.graphics.g2d.BitmapFont();
         font.getData().setScale(2f);
@@ -143,6 +172,8 @@ public class GameScreen implements Screen {
         camera = new OrthographicCamera();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
         camera.position.set(WORLD_WIDTH / 2f, WORLD_HEIGHT / 2f, 0);
+
+        //camera.zoom=1.2f;
 
         // --- INICIALIZACIÓN DE LA UI DE PAUSA ---
         uiStage = new Stage(new FitViewport(WORLD_WIDTH, WORLD_HEIGHT));
@@ -202,6 +233,27 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
+
+        // Acumulamos el tiempo
+        tiempoGlobal += delta;
+
+        // Limpiamos pantalla
+        Gdx.gl.glClearColor(0, 0, 0, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        // --- DIBUJO DEL FONDO CON SHADER ---
+        batch.begin();
+        batch.setShader(shaderFondo); // Activamos el shader
+
+        // Le pasamos la variable "u_time" al archivo GLSL
+        shaderFondo.setUniformf("u_time", tiempoGlobal);
+
+        // Dibujamos un rectángulo que cubra toda la pantalla
+        batch.draw(texturaBlanca, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+
+        batch.setShader(null); // Desactivamos el shader para no afectar el resto del juego
+        batch.end();
+
         // --- 1. DETECCIÓN DE BOTÓN DE PAUSA (ESC o Atras) ---
         if ((Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK))
             && estadoActual == EstadoJuego.JUGANDO) {
@@ -294,33 +346,56 @@ public class GameScreen implements Screen {
         // --- 3. DIBUJADO DEL FONDO Y MUNDO (Siempre activo) ---
         camera.update();
         juego.batch.setProjectionMatrix(camera.combined);
+
+        // Limpiamos el buffer del stage anterior (importante para evitar artefactos)
         ScreenUtils.clear(0f, 0f, 0f, 1f);
 
         juego.batch.begin();
 
+        //Fondo Shader
+        juego.batch.setShader(shaderFondo);
+        shaderFondo.setUniformf("u_time",tiempoGlobal);
+        juego.batch.draw(texturaBlanca,-200,-200, WORLD_WIDTH+400,WORLD_HEIGHT+400);
+        juego.batch.setShader(null);
 
-        // Tablero
+        // Variables de centralización de nuestro tablero 480x480
+        float altoTablero = 640f;
+        float offsetYTablero = 80f; // (800 alto de pantalla - 480 alto de tablero) / 2
+
+        // --- INICIO DE RECORTE (SCISSOR) ---
+        juego.batch.flush(); // Obligatorio antes de recortar
+        Rectangle boundsTablero = new Rectangle(0, offsetYTablero, WORLD_WIDTH, altoTablero);
+        Rectangle scissors = new Rectangle();
+        ScissorStack.calculateScissors(camera, viewport.getScreenX(), viewport.getScreenY(), viewport.getScreenWidth(), viewport.getScreenHeight(), juego.batch.getTransformMatrix(), boundsTablero, scissors);
+        ScissorStack.pushScissors(scissors);
+
+        // TABLERO
         float scale = WORLD_WIDTH / texturaTablero.getWidth();
         float scaledHeight = texturaTablero.getHeight() * scale;
-        float offsetY = scrollY % scaledHeight;
+        float scrollOffset = scrollY % scaledHeight;
 
-        float drawY = -offsetY;
-        while (drawY < WORLD_HEIGHT) {
+        float drawY = offsetYTablero - scrollOffset;
+        if (drawY > offsetYTablero) drawY -= scaledHeight; // Evita un hueco si el offset es positivo
+
+        while (drawY < offsetYTablero + altoTablero) {
             juego.batch.draw(texturaTablero, 0, drawY, WORLD_WIDTH, scaledHeight);
             drawY += scaledHeight;
         }
-        //sombras
+
+        // SOMBRAS
         int filaEnBase = (int) (scrollY / CELL_H);
         Texture sombraActual = (filaEnBase % 2 == 0) ? SombraA : SombraB;
         float scaleSombra = WORLD_WIDTH / sombraActual.getWidth();
         float altoSombraEscalada = sombraActual.getHeight() * scaleSombra;
-        juego.batch.draw(sombraActual, 0, 0, WORLD_WIDTH, altoSombraEscalada);
-        //enemigos
+        juego.batch.draw(sombraActual, 0, offsetYTablero, WORLD_WIDTH, altoSombraEscalada);
+
+        // ENEMIGOS
         for (Enemigo e : gestorEnemigos.activos) {
             float px = e.colLogica * CELL_W;
-            float py = (e.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
+            // AÑADIDO: + offsetYTablero
+            float py = (e.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H) + offsetYTablero;
 
-            if (py > -CELL_H && py < WORLD_HEIGHT + CELL_H) {
+            if (py > offsetYTablero - CELL_H && py < offsetYTablero + altoTablero + CELL_H) {
                 TextureRegion region = regionesEnemigos.get(e.tipo);
                 if (region != null) {
                     juego.batch.draw(region, px, py, CELL_W, CELL_H);
@@ -328,50 +403,13 @@ public class GameScreen implements Screen {
             }
         }
 
-        // Textos de interfaz
-        if (estadoActual == EstadoJuego.JUGANDO) {
-            if (modoActual == ModoJuego.TUTORIAL) {
-                font.draw(juego.batch, "Tutorial " + nivelActual + " - Meta: " + filaMeta, 20, WORLD_HEIGHT - 20);
-            } else {
-                font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, WORLD_HEIGHT - 20);
-
-                // HUD Exclusivo de Contrarreloj
-                if (modoActual == ModoJuego.CONTRARRELOJ) {
-                    font.draw(juego.batch, "Tiempo: " + (int)tiempoRestante + "s", 20, WORLD_HEIGHT - 60);
-                }
-            }
-        } else if (estadoActual == EstadoJuego.GAME_OVER) {
-            font.getData().setScale(3f);
-            font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 80);
-
-            font.getData().setScale(1.5f);
-            font.draw(juego.batch, mensajeGameOver, WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f + 30);
-
-            font.getData().setScale(2f);
-            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), WORLD_WIDTH / 2f - 70, WORLD_HEIGHT / 2f - 20);
-
-            font.getData().setScale(1.2f);
-            font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 70);
-
-            font.getData().setScale(2f);
-        } else if (estadoActual == EstadoJuego.VICTORIA) {
-            font.getData().setScale(3f);
-            font.draw(juego.batch, "¡VICTORIA!", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
-
-            font.getData().setScale(1.5f);
-            font.draw(juego.batch, "Tutorial completado", WORLD_WIDTH / 2f - 100, WORLD_HEIGHT / 2f - 10);
-
-            font.getData().setScale(1.2f);
-            font.draw(juego.batch, "Toca para continuar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
-
-            font.getData().setScale(2f);
-        }
-        // Power-ups
+        // POWER-UPS
         for (PowerUp p : gestorEnemigos.powerUpsActivos) {
             float px = p.colLogica * CELL_W;
-            float py = (p.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
+            // AÑADIDO: + offsetYTablero
+            float py = (p.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H) + offsetYTablero;
 
-            if (py > -CELL_H && py < WORLD_HEIGHT + CELL_H) {
+            if (py > offsetYTablero - CELL_H && py < offsetYTablero + altoTablero + CELL_H) {
                 if (p.tipo == TipoPowerUp.CAMBIO) juego.batch.setColor(com.badlogic.gdx.graphics.Color.MAGENTA);
                 else if (p.tipo == TipoPowerUp.ESCUDO) juego.batch.setColor(com.badlogic.gdx.graphics.Color.BLUE);
                 else if (p.tipo == TipoPowerUp.SACUDIR_MESA) juego.batch.setColor(com.badlogic.gdx.graphics.Color.ORANGE);
@@ -383,21 +421,60 @@ public class GameScreen implements Screen {
                 juego.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
             }
         }
-        // Definir qué textura usar para el jugador (Rey o Transformación)
+
+        // JUGADOR
         TextureRegion regionDibujo = (movimientosCambio > 0 && piezaTransformada != null)
             ? regionesJugador.get(piezaTransformada)
             : piezaRey;
 
         float pxJugador = isDragging ? dragX : (jugadorCol * CELL_W);
-        float pyJugador = isDragging ? dragY : ((filaLogicaJugador * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H));
+        // AÑADIDO: + offsetYTablero al cálculo si no se está arrastrando
+        float pyJugador = isDragging ? dragY : ((filaLogicaJugador * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H) + offsetYTablero);
 
         juego.batch.draw(regionDibujo, pxJugador, pyJugador, CELL_W, CELL_H);
 
-        // Aura de escudo
+        // AURA DE ESCUDO
         if (tieneEscudo) {
             juego.batch.setColor(0, 0, 1, 0.4f);
-            juego.batch.draw(texturaPixelBlanco, jugadorCol * CELL_W, JUGADOR_FILA_VIS * CELL_H, CELL_W, CELL_H);
+            juego.batch.draw(texturaPixelBlanco, jugadorCol * CELL_W, (JUGADOR_FILA_VIS * CELL_H) + offsetYTablero, CELL_W, CELL_H);
             juego.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
+        }
+
+        // --- FIN DE RECORTE (SCISSOR) ---
+        juego.batch.flush(); // Obligatorio antes de quitar el recorte
+        ScissorStack.popScissors();
+
+        // TEXTOS DE INTERFAZ (Ahora se dibujan libres por encima del shader)
+        if (estadoActual == EstadoJuego.JUGANDO) {
+            if (modoActual == ModoJuego.TUTORIAL) {
+                font.draw(juego.batch, "Tutorial " + nivelActual + " - Meta: " + filaMeta, 20, WORLD_HEIGHT - 20);
+            } else {
+                font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, WORLD_HEIGHT - 20);
+
+                if (modoActual == ModoJuego.CONTRARRELOJ) {
+                    font.draw(juego.batch, "Tiempo: " + (int)tiempoRestante + "s", 20, WORLD_HEIGHT - 60);
+                }
+            }
+        } else if (estadoActual == EstadoJuego.GAME_OVER) {
+            // ... (Mismo código de game over que ya tienes)
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "GAME OVER", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 80);
+            font.getData().setScale(1.5f);
+            font.draw(juego.batch, mensajeGameOver, WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f + 30);
+            font.getData().setScale(2f);
+            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), WORLD_WIDTH / 2f - 70, WORLD_HEIGHT / 2f - 20);
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para reiniciar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 70);
+            font.getData().setScale(2f);
+        } else if (estadoActual == EstadoJuego.VICTORIA) {
+            // ... (Mismo código de victoria que ya tienes)
+            font.getData().setScale(3f);
+            font.draw(juego.batch, "¡VICTORIA!", WORLD_WIDTH / 2f - 110, WORLD_HEIGHT / 2f + 50);
+            font.getData().setScale(1.5f);
+            font.draw(juego.batch, "Tutorial completado", WORLD_WIDTH / 2f - 100, WORLD_HEIGHT / 2f - 10);
+            font.getData().setScale(1.2f);
+            font.draw(juego.batch, "Toca para continuar", WORLD_WIDTH / 2f - 90, WORLD_HEIGHT / 2f - 60);
+            font.getData().setScale(2f);
         }
 
         juego.batch.end();
@@ -432,7 +509,8 @@ public class GameScreen implements Screen {
 
             if (Gdx.input.justTouched()) {
                 float px = jugadorCol * CELL_W;
-                float py = (filaLogicaJugador * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H);
+
+                float py = (filaLogicaJugador * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H) + 80f;
 
                 if (touchPoint.x >= px && touchPoint.x <= px + CELL_W &&
                     touchPoint.y >= py && touchPoint.y <= py + CELL_H) {
@@ -451,7 +529,8 @@ public class GameScreen implements Screen {
 
                 int targetCol = (int) (touchPoint.x / CELL_W);
 
-                float yRealTablero = touchPoint.y + scrollY - (JUGADOR_FILA_VIS * CELL_H);
+
+                float yRealTablero = touchPoint.y - 80f + scrollY - (JUGADOR_FILA_VIS * CELL_H);
                 int nuevaFilaLogica = (int) (yRealTablero / CELL_H);
                 if (yRealTablero < 0) nuevaFilaLogica -= 1; // Previene un bug con números negativos
 

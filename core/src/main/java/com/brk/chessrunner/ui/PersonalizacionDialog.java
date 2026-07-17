@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Dialog;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -22,48 +23,75 @@ public class PersonalizacionDialog extends Dialog {
         setResizable(false);
         getContentTable().pad(20);
 
-        // --- SECCIÓN 1: PIEZAS ---
-        getContentTable().add(new Label("Color de las Piezas:", skin)).colspan(2).padBottom(10).row();
-
-        Table tablaPiezas = new Table();
-        TextButton btnPiezasBlancas = new TextButton("Blancas", skin);
-        TextButton btnPiezasNegras = new TextButton("Negras", skin);
-
-        tablaPiezas.add(btnPiezasBlancas).padRight(15).width(90);
-        tablaPiezas.add(btnPiezasNegras).width(90);
-        getContentTable().add(tablaPiezas).colspan(2).padBottom(25).row();
-
-        // --- SECCIÓN 2: TABLERO ---
-        getContentTable().add(new Label("Estilo del Tablero:", skin)).colspan(2).padBottom(10).row();
+        // --- SECCIÓN 1: TABLEROS (Deslizable) ---
+        getContentTable().add(new Label("ESCOGE TABLERO", skin)).padBottom(10).row();
 
         Table tablaTableros = new Table();
-        TextButton btnTableroClasico = new TextButton("Clasico", skin);
-        TextButton btnTableroMadera = new TextButton("Madera", skin);
 
-        tablaTableros.add(btnTableroClasico).padRight(15).width(90);
-        tablaTableros.add(btnTableroMadera).width(90);
-        getContentTable().add(tablaTableros).colspan(2).padBottom(20).row();
+        // Generamos los 8 botones de tableros dinámicamente y les asignamos el guardado
+        for(int i = 1; i <= 8; i++) {
+            TextButton btnTab = new TextButton("Tablero\n" + i, skin);
+            final int indexTablero = i;
 
-        // --- Aqui se colocaria la logica de guardado  ---
-        btnPiezasBlancas.addListener(new ClickListener() {
+            btnTab.addListener(new ClickListener() {
+                @Override
+                public void clicked(InputEvent event, float x, float y) {
+                    // Guardamos el número de tablero elegido
+                    prefs.putInteger("estiloTablero", indexTablero);
+                    prefs.flush();
+                    System.out.println("Guardado: Tablero " + indexTablero);
+                }
+            });
+
+            tablaTableros.add(btnTab).width(120).height(100).pad(5);
+        }
+
+
+        ScrollPane scrollTableros = new ScrollPane(tablaTableros, skin);
+        scrollTableros.setScrollingDisabled(false, true); // Scroll horizontal activado, vertical bloqueado
+        scrollTableros.setFadeScrollBars(false);
+
+        // Ancho fijo de 380 para forzar que el contenido no quepa y se pueda deslizar con el dedo
+        getContentTable().add(scrollTableros).width(380).height(130).padBottom(30).row();
+
+        // --- SECCIÓN 2: COLORES ---
+        getContentTable().add(new Label("ESCOGE COLOR", skin)).padBottom(10).row();
+
+        Table tablaColores = new Table();
+        TextButton btnNegra = new TextButton("Ficha\nNegra", skin);
+        TextButton btnBlanca = new TextButton("Ficha\nBlanca", skin);
+
+        btnNegra.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                prefs.putString("estiloPiezas", "negras");
+                prefs.flush();
+                System.out.println("Guardado: Fichas Negras");
+            }
+        });
+
+        btnBlanca.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 prefs.putString("estiloPiezas", "blancas");
                 prefs.flush();
-                // Se podria agregar que se cambie el color del boton para indicar que esta seleccionado o
-                //se cambias a un checkbox para aceptar
+                System.out.println("Guardado: Fichas Blancas");
             }
         });
+
+        tablaColores.add(btnNegra).width(140).height(80).pad(10);
+        tablaColores.add(btnBlanca).width(140).height(80).pad(10);
+        getContentTable().add(tablaColores).row();
 
         // --- BOTÓN DE VOLVER ---
         TextButton btnAceptar = new TextButton("Aceptar", skin);
         btnAceptar.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                hide(); //Cierre del dialog para volver al menu config
+                hide(); // Cierre del dialog para volver al menu config
             }
         });
 
-        getButtonTable().add(btnAceptar).pad(10).width(120);
+        getButtonTable().add(btnAceptar).pad(10).width(150);
     }
 }

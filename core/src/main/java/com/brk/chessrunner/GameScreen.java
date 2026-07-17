@@ -160,6 +160,17 @@ public class GameScreen implements Screen {
         texturaPiezasNegras = new Texture(Gdx.files.internal("piezas_negras.png"));
         texturaPiezasBlancas = new Texture(Gdx.files.internal("piezas_blancas.png"));
         regionesEnemigos = new ObjectMap<>();
+        com.badlogic.gdx.Preferences prefs = Gdx.app.getPreferences("ChessRunnerSettings");
+        String colorElegido = prefs.getString("estiloPiezas", "blancas"); // "blancas" es el valor por defecto
+
+        // 1 = Jugador Blanco / 2 = Jugador Negro
+        if (colorElegido.equals("negras")) {
+            configColorEnemigo = 2;
+        } else {
+            configColorEnemigo = 1;
+        }
+
+        // Aplicamos el color al juego
         asignarSetDePiezas(configColorEnemigo);
 
         gestorEnemigos = new GestorEnemigos();
@@ -854,7 +865,10 @@ public class GameScreen implements Screen {
     public void resume() { }
 
     @Override
-    public void hide() { }
+    public void hide() {
+        // Limpiamos el procesador de entrada al salir de la pantalla
+        Gdx.input.setInputProcessor(null);
+    }
 
     @Override
     public void dispose() {
@@ -864,6 +878,9 @@ public class GameScreen implements Screen {
         texturaPiezasNegras.dispose();
         texturaPiezasBlancas.dispose();
         if (texturaPixelBlanco != null) texturaPixelBlanco.dispose();
+        if (texturaBlanca != null) texturaBlanca.dispose();
+        if (shaderFondo != null) shaderFondo.dispose();
+        if (batch != null) batch.dispose();
 
         if (uiStage != null) uiStage.dispose();
         if (uiSkin != null) uiSkin.dispose();

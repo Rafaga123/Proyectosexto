@@ -6,6 +6,7 @@ varying vec4 v_color;
 varying vec2 v_texCoords;
 
 uniform float u_time; // El tiempo que le pasaremos desde Java
+uniform vec3 u_colorBase;
 
 void main() {
     // Coordenadas base
@@ -18,14 +19,16 @@ void main() {
     // Creamos un patrón de ruido suave usando senos combinados
     float pattern = sin(uv.x * 10.0) * cos(uv.y * 10.0) * 0.5 + 0.5;
 
-    // Paleta de colores claros (R, G, B) de 0.0 a 1.0
-    vec3 colorVerdeClaro = vec3(0.7, 0.95, 0.7);
-    vec3 colorMenta = vec3(0.5, 0.85, 0.7);
-    vec3 colorTurquesa = vec3(0.6, 0.9, 0.85);
+    //Logica de colores basado en el tablero
+    vec3 colorPrimario= u_colorBase;
+
+    //Se calcula colores derivados tanto oscureciendo como iluminando al base
+    vec3 colorSecundario = colorPrimario * 0.7;
+    vec3 colorAcento = clamp(colorPrimario * 1.2,0.0,1.0);
 
     // Mezclamos los colores basados en el patrón en movimiento
-    vec3 colorFinal = mix(colorVerdeClaro, colorMenta, pattern);
-    colorFinal = mix(colorFinal, colorTurquesa, sin(u_time * 0.5 + uv.x) * 0.5 + 0.5);
+    vec3 colorFinal = mix(colorPrimario, colorSecundario,pattern);
+    colorFinal = mix(colorFinal, colorAcento, sin(u_time * 0.5 + uv.x) * 0.5 + 0.5);
 
     // Salida a la pantalla
     gl_FragColor = vec4(colorFinal, 1.0) * v_color;

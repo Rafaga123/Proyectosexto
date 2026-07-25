@@ -19,7 +19,11 @@ public class LoginDialog extends Dialog {
     public LoginDialog(String title, Skin skin, LocalDatabase db, MainGame juego) {
         super(title, skin);
 
-        // Campos de texto
+        getContentTable().pad(20);
+
+        Label lblTitulo = new Label("Iniciar Sesión", skin, "titulo");
+        getContentTable().add(lblTitulo).padBottom(20).row();
+
         TextField emailField = new TextField("", skin);
         emailField.setMessageText("Correo electrónico");
 
@@ -28,45 +32,37 @@ public class LoginDialog extends Dialog {
         passField.setPasswordMode(true);
         passField.setPasswordCharacter('*');
 
-        Label errorLabel = new Label("", skin);
-        errorLabel.setColor(1, 0, 0, 1); // Color Rojo para errores
+        Label errorLabel = new Label("", skin, "hud");
+        errorLabel.setWrap(true);
 
-        // Construir la estructura visual (Tabla central)
-        getContentTable().add(new Label("Ingresa tus credenciales:", skin)).padBottom(10).row();
-        getContentTable().add(emailField).width(250).padBottom(10).row();
-        getContentTable().add(passField).width(250).padBottom(10).row();
-        getContentTable().add(errorLabel).padBottom(10).row();
+        getContentTable().add(emailField).width(260).padBottom(12).row();
+        getContentTable().add(passField).width(260).padBottom(12).row();
+        getContentTable().add(errorLabel).width(260).padBottom(5).row();
 
-        // Botones inferiores
         TextButton btnLogin = new TextButton("Entrar", skin);
         TextButton btnCancelar = new TextButton("Cancelar", skin);
 
-        // Lógica del botón Entrar
         btnLogin.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                errorLabel.setColor(1, 1, 1, 1); // Blanco
+                errorLabel.setColor(1, 1, 1, 1);
                 errorLabel.setText("Conectando...");
 
                 String email = emailField.getText();
                 String pass = passField.getText();
 
-                // Llamada a tu API de Spring Boot
                 ApiClient.login(email, pass, new ApiClient.ApiCallback() {
                     @Override
                     public void onExito(JsonValue respuesta) {
-                        // Gdx.app.postRunnable es obligatorio para modificar la UI desde la respuesta de red
                         Gdx.app.postRunnable(() -> {
                             String id = respuesta.getString("id");
                             String alias = respuesta.getString("alias");
                             String correo = respuesta.getString("correo");
 
-                            // Guardamos en SQLite
                             UsuarioLocal usuarioApi = new UsuarioLocal(id, alias, correo, true);
                             db.vincularCuenta(usuarioApi);
 
-                            hide(); // Cierra el modal
-                            // Refresca la pantalla principal para que muestre tu Alias real
+                            hide();
                             juego.setScreen(new MainMenuScreen(juego, db));
                         });
                     }
@@ -74,7 +70,7 @@ public class LoginDialog extends Dialog {
                     @Override
                     public void onError(String mensajeError) {
                         Gdx.app.postRunnable(() -> {
-                            errorLabel.setColor(1, 0, 0, 1); // Rojo
+                            errorLabel.setColor(1, 0.3f, 0.3f, 1);
                             errorLabel.setText(mensajeError);
                         });
                     }
@@ -82,7 +78,6 @@ public class LoginDialog extends Dialog {
             }
         });
 
-        // Lógica del botón Cancelar
         btnCancelar.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -90,7 +85,7 @@ public class LoginDialog extends Dialog {
             }
         });
 
-        getButtonTable().add(btnLogin).pad(10);
-        getButtonTable().add(btnCancelar).pad(10);
+        getButtonTable().add(btnLogin).pad(8).width(120);
+        getButtonTable().add(btnCancelar).pad(8).width(120);
     }
 }

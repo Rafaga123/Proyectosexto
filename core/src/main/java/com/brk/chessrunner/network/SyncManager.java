@@ -42,9 +42,11 @@ public class SyncManager {
 
             @Override
             public void onError(String mensajeError) {
-                // En modo silencioso no mostramos error de conexión para no molestar,
-                // el jugador lo intentará después con el botón manual si quiere.
-                System.err.println("Sync silencioso falló: " + mensajeError);
+                Gdx.app.postRunnable(() -> {
+                    if (stage != null && skin != null) {
+                        Toast.show(stage, "✗ " + mensajeError, skin, new com.badlogic.gdx.graphics.Color(0.15f, 0.05f, 0.05f, 0.9f));
+                    }
+                });
             }
         });
     }

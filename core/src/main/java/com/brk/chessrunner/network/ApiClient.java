@@ -25,22 +25,17 @@ public class ApiClient {
      */
     private static String traducirError(int statusCode, String rawBody) {
         // Si el cuerpo tiene texto (y no es un JSON gigante), a menudo es el mensaje de error del Result Pattern
-        if (rawBody != null && rawBody.length() > 0 && rawBody.length() < 100 && !rawBody.contains("{")) {
+        if (rawBody != null && !rawBody.isEmpty() && rawBody.length() < 100 && !rawBody.contains("{")) {
             return rawBody;
         }
 
-        switch (statusCode) {
-            case 401:
-                return "Credenciales incorrectas. Verifica tu correo y contraseña.";
-            case 403:
-                return "Acceso denegado. Tu cuenta podría estar inactiva o baneada.";
-            case 404:
-                return "El servidor no responde. Verifica la configuración de la IP.";
-            case 500:
-                return "Error interno del servidor. Reintenta en unos momentos.";
-            default:
-                return "Error inesperado (" + statusCode + "). Revisa tu conexión.";
-        }
+        return switch (statusCode) {
+            case 401 -> "Credenciales incorrectas. Revise su correo y contraseña.";
+            case 403 -> "Acceso denegado. Su cuenta podría estar inactiva o bloqueada.";
+            case 404 -> "El servidor no responde. Revise la configuración de la IP.";
+            case 500 -> "Error interno del servidor. Intente de nuevo en unos momentos.";
+            default -> "Error inesperado (" + statusCode + "). Revise su conexión a internet.";
+        };
     }
 
     /**
@@ -79,12 +74,12 @@ public class ApiClient {
 
             @Override
             public void failed(Throwable t) {
-                callback.onError("No se pudo conectar con el servidor. ¿Está encendida la API?");
+                callback.onError("Revise su conexión a internet");
             }
 
             @Override
             public void cancelled() {
-                callback.onError("Petición cancelada");
+                callback.onError("Conexión cancelada");
             }
         });
     }
@@ -138,9 +133,9 @@ public class ApiClient {
                 }
             }
             @Override
-            public void failed(Throwable t) { callback.onError("Fallo de conexión: " + t.getMessage()); }
+            public void failed(Throwable t) { callback.onError("Revise su conexión a internet"); }
             @Override
-            public void cancelled() { callback.onError("Sincronización cancelada"); }
+            public void cancelled() { callback.onError("Conexión cancelada"); }
         });
     }
 }

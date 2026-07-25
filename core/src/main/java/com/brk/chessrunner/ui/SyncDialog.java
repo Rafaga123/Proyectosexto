@@ -3,8 +3,10 @@ package com.brk.chessrunner.ui;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Dialog;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.JsonValue;
@@ -19,25 +21,36 @@ public class SyncDialog extends Dialog {
 
     public SyncDialog(String title, Skin skin, LocalDatabase db) {
         super(title, skin);
+        getTitleLabel().setFontScale(0.8f);
 
-        Label infoLabel = new Label("Buscando partidas...", skin);
-        getContentTable().add(infoLabel).pad(20).row();
+        getContentTable().pad(25);
 
+        Label lblTitulo = new Label("Sincronización", skin, "titulo");
+        getContentTable().add(lblTitulo).padBottom(15).row();
+
+        Label infoLabel = new Label("Buscando partidas...", skin, "hud");
+        infoLabel.setWrap(true);
+        getContentTable().add(infoLabel).width(280).padBottom(10).row();
+
+        Image icono = new Image(skin, "default-rect");
+        getContentTable().add(icono).size(48, 48).padBottom(10).row();
+
+        Table botonTable = new Table();
         TextButton btnCerrar = new TextButton("Cerrar", skin);
-        getButtonTable().add(btnCerrar).pad(10);
+        botonTable.add(btnCerrar).pad(10).width(150);
+        getButtonTable().add(botonTable);
 
         btnCerrar.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) { hide(); }
         });
 
-        // Lógica de sincronización automática al abrir el modal
         UsuarioLocal usuario = db.obtenerUsuarioActual();
         if (usuario != null) {
             List<PartidaLocal> pendientes = db.obtenerPartidasNoSincronizadas(usuario.getId());
 
             if (pendientes.isEmpty()) {
-                infoLabel.setText("No hay partidas nuevas\npara sincronizar.");
+                infoLabel.setText("No hay partidas nuevas para sincronizar.");
             } else {
                 infoLabel.setText("Subiendo " + pendientes.size() + " partidas a la nube...");
 
@@ -45,11 +58,10 @@ public class SyncDialog extends Dialog {
                     @Override
                     public void onExito(JsonValue respuesta) {
                         Gdx.app.postRunnable(() -> {
-                            // Si el servidor dijo OK, las marcamos en SQLite
                             for (PartidaLocal p : pendientes) {
                                 db.marcarComoSincronizada(p.getId());
                             }
-                            infoLabel.setColor(0, 1, 0, 1); // Verde
+                            infoLabel.setColor(0, 1, 0, 1);
                             infoLabel.setText("¡Sincronización exitosa!\n" + pendientes.size() + " partidas subidas.");
                         });
                     }
@@ -57,8 +69,8 @@ public class SyncDialog extends Dialog {
                     @Override
                     public void onError(String mensajeError) {
                         Gdx.app.postRunnable(() -> {
-                            infoLabel.setColor(1, 0, 0, 1); // Rojo
-                            infoLabel.setText("Error: " + mensajeError);
+                            infoLabel.setColor(1, 0, 0, 1);
+                            infoLabel.setText(mensajeError);
                         });
                     }
                 });

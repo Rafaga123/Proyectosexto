@@ -5,18 +5,24 @@ Color: {
 	white: { a: 1, b: 1, g: 1, r: 1 },
 	red: { a: 1, b: 0, g: 0, r: 1 },
 	black: { a: 1, b: 0, g: 0, r: 0 },
-	gray: { a: 1, b: 0.8, g: 0.8, r: 0.8 },
+	gray: { a: 1, b: 0.6, g: 0.6, r: 0.6 },
+	gold: { a: 1, b: 0.1, g: 0.84, r: 1.0 },
+	darkBg: { a: 1, b: 0.1, g: 0.1, r: 0.12 },
+	accent: { a: 1, b: 0.5, g: 0.7, r: 0.25 }
 },
 TintedDrawable: {
-	dialogDim: { name: white, color: { r: 0, g: 0, b: 0, a: 0.45 } },
+	dialogDim: { name: white, color: { r: 0, g: 0, b: 0, a: 0.7 } },
+	btnUp: { name: default-round, color: { r: 0.15, g: 0.15, b: 0.25, a: 1 } },
+	btnDown: { name: default-round-down, color: { r: 0.3, g: 0.5, b: 0.8, a: 1 } },
+	overlay: { name: white, color: { r: 0, g: 0, b: 0, a: 0.75 } }
 },
 ButtonStyle: {
-	default: { down: default-round-down, up: default-round, disabled: default-round },
-	toggle: { parent: default, checked: default-round-down }
+	default: { down: btnDown, up: btnUp, disabled: default-round },
+	toggle: { parent: default, checked: btnDown }
 },
 TextButtonStyle: {
-	default: { parent: default, font: default-font, fontColor: white, disabledFontColor: gray },
-	toggle: { parent: default, checked: default-round-down, downFontColor: red }
+	default: { parent: default, font: default-font, fontColor: white, disabledFontColor: gray, overFontColor: gold, downFontColor: gold },
+	toggle: { parent: default, checked: btnDown, downFontColor: gold }
 },
 ScrollPaneStyle: {
 	default: { vScroll: default-scroll, hScrollKnob: default-round-large, background: default-rect, hScroll: default-scroll, vScrollKnob: default-round-large }
@@ -33,8 +39,8 @@ SplitPaneStyle: {
 	default-horizontal: { handle: default-splitpane }
 },
 WindowStyle: {
-	default: { titleFont: default-font, background: default-window, titleFontColor: white },
-	dialog: { parent: default, stageBackground: dialogDim }
+	default: { titleFont: default-font, background: default-window, titleFontColor: gold },
+	dialog: { parent: default, stageBackground: dialogDim, titleFontColor: gold }
 },
 ProgressBarStyle: {
 	default-horizontal: { background: default-slider, knob: default-slider-knob },
@@ -45,7 +51,11 @@ SliderStyle: {
 	default-vertical: { parent: default-vertical }
 },
 LabelStyle: {
-	default: { font: default-font, fontColor: white }
+	default: { font: default-font, fontColor: white },
+	titulo: { font: default-font, fontColor: gold },
+	hud: { font: default-font, fontColor: white },
+	gameover: { font: default-font, fontColor: red },
+	normal: { font: default-font, fontColor: white }
 },
 TextFieldStyle: {
 	default: { selection: selection, background: textfield, font: default-font, fontColor: white, cursor: cursor }

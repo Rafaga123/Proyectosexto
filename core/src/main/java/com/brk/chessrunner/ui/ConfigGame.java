@@ -26,12 +26,12 @@ public class ConfigGame extends Dialog {
         getContentTable().pad(20);
 
         // Control de Audio (Música)
-        Label musicLabel = new Label("Volumen Musica:", skin);
+        Label musicLabel = new Label("Volumen Musica:", skin, "hud");
         musicSlider = new Slider(0, 1, 0.1f, false, skin);
         musicSlider.setValue(prefs.getFloat("musicVolume", 0.8f));
 
         // Efectos de Sonido
-        Label fxLabel = new Label("Efectos de Sonido:", skin);
+        Label fxLabel = new Label("Efectos de Sonido:", skin, "hud");
         fxSlider = new Slider(0, 1, 0.1f, false, skin);
         fxSlider.setValue(prefs.getFloat("fxVolume", 0.5f));
 

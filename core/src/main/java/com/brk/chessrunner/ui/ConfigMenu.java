@@ -31,18 +31,18 @@ public class ConfigMenu extends Dialog {
         getContentTable().pad(20);
 
         // --- Seccion del volumen ---
-        getContentTable().add(new Label("Volumen Musica:", skin)).left().padRight(10);
+        getContentTable().add(new Label("Volumen Musica:", skin, "hud")).left().padRight(10);
         musicSlider = new Slider(0, 1, 0.1f, false, skin);
         musicSlider.setValue(prefs.getFloat("musicVolume", 0.8f));
         getContentTable().add(musicSlider).width(150).row();
 
-        getContentTable().add(new Label("Efectos de Sonido:", skin)).left().padRight(10).padTop(10);
+        getContentTable().add(new Label("Efectos de Sonido:", skin, "hud")).left().padRight(10).padTop(10);
         fxSlider = new Slider(0, 1, 0.1f, false, skin);
         fxSlider.setValue(prefs.getFloat("fxVolume", 0.5f));
         getContentTable().add(fxSlider).width(150).row();
 
         // --- Seccion de la Red de configuracion ---
-        getContentTable().add(new Label("IP del Servidor:", skin)).left().padRight(10).padTop(10);
+        getContentTable().add(new Label("IP del Servidor:", skin, "hud")).left().padRight(10).padTop(10);
         ipField = new TextField("", skin);
         ipField.setText(prefs.getString("serverIp", "192.168.1.100"));
         ipField.setMessageText("192.168.1.100");

@@ -1,9 +1,11 @@
 package com.brk.chessrunner.ui;
 
-import com.badlogic.gdx.Input;
+import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Dialog;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -11,7 +13,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.brk.chessrunner.MainGame;
 import com.brk.chessrunner.ui.MainMenuScreen;
-
 
 public class PauseWidget extends Table {
 
@@ -33,8 +34,11 @@ public class PauseWidget extends Table {
 
        setFillParent(true);
 
-       Label pauseLabel= new Label("JUEGO EN PAUSA", skin);
-       pauseLabel.setFontScale(1.8f);
+       Image bg = new Image(skin, "overlay");
+       bg.setFillParent(true);
+       addActor(bg);
+
+       Label pauseLabel= new Label("JUEGO EN PAUSA", skin, "titulo");
 
        TextButton btnReanudar= new TextButton("REANUDAR",skin);
        TextButton btnConfig= new TextButton("CONFIGURACION",skin);
@@ -45,59 +49,62 @@ public class PauseWidget extends Table {
            public void clicked(InputEvent event, float x, float y){
                listener.onResume();
            }
-
        });
 
-       btnConfig.addListener(new ClickListener(){
-          @Override
-          public void clicked(InputEvent event, float x, float y){
-              ConfigGame settingsDialog = new ConfigGame("Configuracion",skin);
-              settingsDialog.show(stage);
-          }
-       });
+        btnConfig.addListener(new ClickListener(){
+           @Override
+           public void clicked(InputEvent event, float x, float y){
+               PauseWidget.this.remove();
+               ConfigGame settingsDialog = new ConfigGame("Configuracion",skin);
+               settingsDialog.show(stage);
+           }
+        });
 
-       btnSalir.addListener(new ClickListener(){
-          public void clicked(InputEvent event, float x, float y ) {
-              mostrarConfirmacionSalida();
-          }
-       });
+        btnSalir.addListener(new ClickListener(){
+           public void clicked(InputEvent event, float x, float y ) {
+               PauseWidget.this.setVisible(false);
+               mostrarConfirmacionSalida();
+           }
+        });
 
        add(pauseLabel).padBottom(40f).row();
        add(btnReanudar).size(220f,50f).padBottom(15f).row();
        add(btnConfig).size(220f,50f).padBottom(15f).row();
        add(btnSalir).size(220f,50f);
+
+       getColor().a = 0f;
+       addAction(Actions.fadeIn(0.25f, Interpolation.sineOut));
    }
 
-   private void mostrarConfirmacionSalida(){
+    private void mostrarConfirmacionSalida(){
+        Dialog confirmarDialog = new Dialog("Alerta",skin){
+            @Override
+            protected void result(Object object){
+                if( object instanceof Boolean && (Boolean) object){
+                    com.badlogic.gdx.Screen pantallaActual= game.getScreen();
+                    game.switchScreen(new MainMenuScreen(game, game.db));
+                    if(pantallaActual!=null){
+                         pantallaActual.dispose();
+                    }
+                } else {
+                    PauseWidget.this.setVisible(true);
+                }
+            }
+        };
 
-       Dialog confirmarDialog = new Dialog("Alerta",skin){
-           @Override
-           protected void result(Object object){
-               if( object instanceof Boolean && (Boolean) object){
-                   com.badlogic.gdx.Screen pantallaActual= game.getScreen();
-                   game.setScreen(new MainMenuScreen(game, game.db));
-
-                   if(pantallaActual!=null){
-                        pantallaActual.dispose();
-                   }
-               }
-
-           }
-
-       };
-
-       confirmarDialog.text("¿Seguro que quieres salir?");
-
-       TextButton btnSi = new TextButton("SI",skin);
-       TextButton btnNo= new TextButton("NO",skin);
-
-       confirmarDialog.button(btnSi, true);
-       confirmarDialog.button(btnNo, false);
-
-       confirmarDialog.setMovable(false);
-       confirmarDialog.show(stage);
-
-   }
-
+        confirmarDialog.getTitleLabel().setFontScale(1.25f);
+        confirmarDialog.getContentTable().pad(20, 40, 20, 40);
+        Label lblMsg = new Label("¿Seguro que quieres salir?", skin, "hud");
+        lblMsg.setFontScale(1.2f);
+        confirmarDialog.text(lblMsg);
+        TextButton btnSi = new TextButton("SI",skin);
+        TextButton btnNo = new TextButton("NO",skin);
+        btnSi.getLabel().setFontScale(1.2f);
+        btnNo.getLabel().setFontScale(1.2f);
+        confirmarDialog.button(btnSi, true);
+        confirmarDialog.button(btnNo, false);
+        confirmarDialog.setMovable(false);
+        confirmarDialog.show(stage);
+    }
 
 }

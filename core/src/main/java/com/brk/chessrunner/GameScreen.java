@@ -8,8 +8,17 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+import com.badlogic.gdx.scenes.scene2d.ui.Window;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.ObjectMap;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.Viewport;
@@ -17,6 +26,7 @@ import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack;
+import com.badlogic.gdx.math.Interpolation;
 import com.brk.chessrunner.database.PartidaLocal;
 import com.brk.chessrunner.database.UsuarioLocal;
 import com.brk.chessrunner.ui.PauseWidget;
@@ -30,7 +40,6 @@ public class GameScreen implements Screen {
     OrthographicCamera camera;
     Viewport viewport;
     Vector3 touchPoint;
-    com.badlogic.gdx.graphics.g2d.BitmapFont font;
 
     public enum EstadoJuego {
         JUGANDO,
@@ -43,7 +52,6 @@ public class GameScreen implements Screen {
     Texture SombraA;
     Texture SombraB;
 
-    // --- VARIABLES DE TABLERO ADAPTATIVO ---
     float altoTablero = 768f;
     float offsetYTablero = 0f;
 
@@ -54,7 +62,7 @@ public class GameScreen implements Screen {
     GestorEnemigos gestorEnemigos;
     public ModoJuego modoActual;
     public int nivelActual;
-    public int filaMeta = -2; // -2 = Infinito (No hay meta)
+    public int filaMeta = -2;
     public float tiempoRestante;
     public String mensajeGameOver = "";
 
@@ -79,30 +87,23 @@ public class GameScreen implements Screen {
     float dragX = 0f;
     float dragY = 0f;
 
-    // --- VARIABLES DE POWER-UPS ---
     public boolean tieneEscudo = false;
     public float tiempoEscudo = 0f;
-
     public int movimientosCambio = 0;
     public TipoPieza piezaTransformada;
-
     public int movimientosIA = 0;
     public float temporizadorIA = 0f;
     public int ultimaFilaGenerada = 5;
-
     public float tiempoReloj = 0f;
     private Texture texturaPixelBlanco;
 
-    // --- VARIABLES DE INTERFAZ DE PAUSA ---
-    private com.badlogic.gdx.scenes.scene2d.ui.Table hudTable;
+    private Table hudTable;
     private Stage uiStage;
     private Skin uiSkin;
     private PauseWidget pauseWidget;
-
     private boolean juegoPausado = false;
     private float tiempoJugado = 0f;
 
-    // --- VARIABLES DEL SHADER Y FONDO ---
     private ShaderProgram shaderFondo;
     private float tiempoGlobal = 0f;
     private Texture texturaBlanca;
@@ -110,8 +111,15 @@ public class GameScreen implements Screen {
     float fondoG = 0.85f;
     float fondoB = 0.7f;
 
+    private Label lblPuntos;
+    private Label lblTiempo;
+    private Label lblTutorial;
+    private Table overlayTable;
+    private Label lblOverlayTitulo;
+    private Label lblOverlaySub;
+    private Label lblOverlayPuntos;
+    private Label lblOverlayAccion;
 
-    // El constructor recibe el juego principal
     public GameScreen(MainGame juego, ModoJuego modoActual, int nivel) {
         this.juego = juego;
         this.modoActual = modoActual;
@@ -126,10 +134,8 @@ public class GameScreen implements Screen {
         }
     }
 
-
     @Override
     public void show() {
-
         texturaBlanca = new Texture("ui/default.png");
 
         ShaderProgram.pedantic = false;
@@ -143,49 +149,43 @@ public class GameScreen implements Screen {
         }
 
         touchPoint = new Vector3();
-        font = new com.badlogic.gdx.graphics.g2d.BitmapFont();
-        font.getData().setScale(2f);
 
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
 
-        // --- Lectura de tablero---
         com.badlogic.gdx.Preferences prefs = Gdx.app.getPreferences("ChessRunnerSettings");
-
-        // Leemos como Integer. Si no existe, usamos 1 por defecto.
         int estiloTablero = prefs.getInteger("estiloTablero", 1);
         String rutaTablero = "tablero.png";
 
-        // Adaptamos el switch para que evalúe el número directamente
         switch (estiloTablero) {
-            case 1: // Clásico
-                fondoR = 0.5f; fondoG = 0.85f; fondoB = 0.7f; // Verde menta
+            case 1:
+                fondoR = 0.5f; fondoG = 0.85f; fondoB = 0.7f;
                 rutaTablero = "tablero.png";
                 break;
-            case 2: // Madera
-                fondoR = 0.75f; fondoG = 0.45f; fondoB = 0.25f; // Marrón
+            case 2:
+                fondoR = 0.75f; fondoG = 0.45f; fondoB = 0.25f;
                 rutaTablero = "tablero_madera.png";
                 break;
-            case 3: // Neón
-                fondoR = 0.8f; fondoG = 0.2f; fondoB = 0.8f; // Morado
+            case 3:
+                fondoR = 0.8f; fondoG = 0.2f; fondoB = 0.8f;
                 rutaTablero = "tablero_neon.png";
                 break;
-            case 4: // Océano
+            case 4:
                 fondoR = 0.2f; fondoG = 0.5f; fondoB = 0.9f;
                 rutaTablero = "tablero_oceano.png";
                 break;
-            case 5: // Volcán
+            case 5:
                 fondoR = 0.8f; fondoG = 0.1f; fondoB = 0.1f;
                 rutaTablero = "tablero_volcan.png";
                 break;
-            case 6: // Desierto
+            case 6:
                 fondoR = 0.9f; fondoG = 0.7f; fondoB = 0.1f;
                 rutaTablero = "tablero_desierto.png";
                 break;
-            case 7: // Tóxico
+            case 7:
                 fondoR = 0.3f; fondoG = 0.9f; fondoB = 0.2f;
                 rutaTablero = "tablero_toxico.png";
                 break;
-            case 8: // Hielo
+            case 8:
                 fondoR = 0.6f; fondoG = 0.9f; fondoB = 0.9f;
                 rutaTablero = "tablero_hielo.png";
                 break;
@@ -195,9 +195,7 @@ public class GameScreen implements Screen {
                 break;
         }
 
-        // --- FallBack para evitar errores al cargar una imagen que no existe ---
         if (!Gdx.files.internal(rutaTablero).exists()) {
-            System.out.println("Aviso: Falta la imagen '" + rutaTablero + "'. Usando tablero clásico.");
             rutaTablero = "tablero.png";
         }
 
@@ -207,20 +205,14 @@ public class GameScreen implements Screen {
         SombraA = new Texture(Gdx.files.internal("sombra_a.png"));
         SombraB = new Texture(Gdx.files.internal("sombra_b.png"));
 
-        // 2. Preferencias del Color de Piezas
         texturaPiezasNegras = new Texture(Gdx.files.internal("piezas_negras.png"));
         texturaPiezasBlancas = new Texture(Gdx.files.internal("piezas_blancas.png"));
         regionesEnemigos = new ObjectMap<>();
 
         String colorElegido = prefs.getString("estiloPiezas", "blancas");
-        if (colorElegido.equals("negras")) {
-            configColorEnemigo = 2;
-        } else {
-            configColorEnemigo = 1;
-        }
+        configColorEnemigo = colorElegido.equals("negras") ? 2 : 1;
         asignarSetDePiezas(configColorEnemigo);
 
-        // --- RESTO DE LA INICIALIZACIÓN ---
         gestorEnemigos = new GestorEnemigos();
         com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
         pixmap.setColor(com.badlogic.gdx.graphics.Color.WHITE);
@@ -232,41 +224,97 @@ public class GameScreen implements Screen {
         viewport = new ExtendViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
         camera.position.set(WORLD_WIDTH / 2f, WORLD_HEIGHT / 2f, 0);
 
-        // UI de Pausa
         uiStage = new Stage(new ExtendViewport(WORLD_WIDTH, WORLD_HEIGHT));
 
         try {
             uiSkin = new Skin(Gdx.files.internal("ui/uiskin.json"));
+            uiSkin.get("titulo", Label.LabelStyle.class).font = juego.fontTitulo;
+            uiSkin.get("hud", Label.LabelStyle.class).font = juego.fontHUD;
+            uiSkin.get("normal", Label.LabelStyle.class).font = juego.fontNormal;
+            uiSkin.get(Label.LabelStyle.class).font = juego.fontNormal;
+            uiSkin.get("gameover", Label.LabelStyle.class).font = juego.fontHUD;
+            uiSkin.get(TextButton.TextButtonStyle.class).font = juego.fontHUD;
+            uiSkin.get(TextField.TextFieldStyle.class).font = juego.fontHUD;
+            uiSkin.get(Window.WindowStyle.class).titleFont = juego.fontTitulo;
+            uiSkin.get("dialog", Window.WindowStyle.class).titleFont = juego.fontTitulo;
         } catch (Exception e) {
             Gdx.app.error("UI", "Error cargando uiskin: " + e.getMessage());
         }
 
-        hudTable = new com.badlogic.gdx.scenes.scene2d.ui.Table();
-        hudTable.setFillParent(true);
+        construirHUD();
 
-        com.badlogic.gdx.scenes.scene2d.ui.TextButton btnPausaHUD = new com.badlogic.gdx.scenes.scene2d.ui.TextButton("||", uiSkin);
-        btnPausaHUD.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+        pauseWidget = new PauseWidget(juego, uiSkin, uiStage, this::quitarPausa);
+
+        Gdx.input.setInputProcessor(uiStage);
+    }
+
+    private void construirHUD() {
+        hudTable = new Table();
+        hudTable.setFillParent(true);
+        hudTable.top().padTop(15f);
+
+        lblPuntos = new Label("Puntos: 0", uiSkin, "hud");
+        lblPuntos.setFontScale(1.4f);
+        lblTiempo = new Label("", uiSkin, "hud");
+        lblTutorial = new Label("", uiSkin, "hud");
+
+        hudTable.add(lblTutorial).expandX().center().padLeft(60f).padRight(60f);
+        hudTable.row();
+        hudTable.add(lblPuntos).expandX().left().padLeft(20f);
+        hudTable.add(lblTiempo).expandX().right().padRight(20f);
+
+        TextButton btnPausaHUD = new TextButton("||", uiSkin);
+        btnPausaHUD.addListener(new ClickListener() {
             @Override
-            public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+            public void clicked(InputEvent event, float x, float y) {
                 if (!juegoPausado && estadoActual == EstadoJuego.JUGANDO) {
                     activarPausa();
                 }
             }
         });
 
-        hudTable.top().right();
-        hudTable.add(btnPausaHUD).size(60f, 60f).padTop(15f).padRight(15f);
+        Table topRight = new Table();
+        topRight.setFillParent(true);
+        topRight.top().right();
+        topRight.add(btnPausaHUD).size(50f, 50f).padTop(5f).padRight(10f);
 
+        uiStage.addActor(topRight);
         uiStage.addActor(hudTable);
 
-        pauseWidget = new PauseWidget(juego, uiSkin, uiStage, new PauseWidget.IPauseListener() {
+        construirOverlay();
+    }
+
+    private void construirOverlay() {
+        overlayTable = new Table();
+        overlayTable.setFillParent(true);
+        overlayTable.setVisible(false);
+
+        Image bgOverlay = new Image(uiSkin, "overlay");
+        bgOverlay.setFillParent(true);
+        overlayTable.addActor(bgOverlay);
+
+        lblOverlayTitulo = new Label("", uiSkin, "gameover");
+        lblOverlaySub = new Label("", uiSkin, "default");
+        lblOverlayPuntos = new Label("", uiSkin, "hud");
+        lblOverlayAccion = new Label("", uiSkin, "normal");
+
+        overlayTable.add(lblOverlayTitulo).padBottom(10f).row();
+        overlayTable.add(lblOverlaySub).padBottom(5f).row();
+        overlayTable.add(lblOverlayPuntos).padBottom(5f).row();
+        overlayTable.add(lblOverlayAccion).padTop(30f);
+
+        overlayTable.addListener(new ClickListener() {
             @Override
-            public void onResume() {
-                quitarPausa();
+            public void clicked(InputEvent event, float x, float y) {
+                if (estadoActual == EstadoJuego.GAME_OVER) {
+                    reiniciarJuego();
+                } else if (estadoActual == EstadoJuego.VICTORIA) {
+                    juego.switchScreen(new com.brk.chessrunner.ui.MainMenuScreen(juego, juego.db));
+                }
             }
         });
 
-        Gdx.input.setInputProcessor(uiStage);
+        uiStage.addActor(overlayTable);
     }
 
     private void activarPausa() {
@@ -285,17 +333,12 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-
         tiempoGlobal += delta;
-
-        // CÁLCULO DINÁMICO ADAPTATIVO: Mantiene el tablero en el centro vertical exacto
         offsetYTablero = (viewport.getWorldHeight() - altoTablero) / 2f;
 
-        // Limpiamos pantalla
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // --- 1. DETECCIÓN DE BOTÓN DE PAUSA ---
         if ((Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK))
             && estadoActual == EstadoJuego.JUGANDO) {
 
@@ -306,7 +349,6 @@ public class GameScreen implements Screen {
             }
         }
 
-        // --- 2. LÓGICA DEL JUEGO ---
         if (!juegoPausado) {
             if (estadoActual == EstadoJuego.JUGANDO) {
 
@@ -356,32 +398,23 @@ public class GameScreen implements Screen {
                     if (pyJugadorCalculado < -CELL_H && estadoActual == EstadoJuego.JUGANDO) {
                         dispararGameOver("¡TE ALCANZÓ EL TABLERO!");
                     }
-
                 } else {
                     scrollY += (targetScrollY - scrollY) * scrollSpeed * delta;
                     camaraAutoY = scrollY;
                 }
 
                 tiempoJugado += delta;
-            } else if (estadoActual == EstadoJuego.GAME_OVER) {
-                if (Gdx.input.justTouched()) {
-                    reiniciarJuego();
-                }
-            } else if (estadoActual == EstadoJuego.VICTORIA) {
-                if (Gdx.input.justTouched()) {
-                    juego.setScreen(new com.brk.chessrunner.ui.MainMenuScreen(juego, juego.db));
-                }
+
+                actualizarHUD();
             }
         }
 
-        // --- 3. DIBUJADO DEL FONDO Y MUNDO ---
         camera.update();
         juego.batch.setProjectionMatrix(camera.combined);
         ScreenUtils.clear(0f, 0f, 0f, 1f);
 
         juego.batch.begin();
 
-        // FONDO SHADER
         juego.batch.setShader(shaderFondo);
         shaderFondo.setUniformf("u_time", tiempoGlobal);
         shaderFondo.setUniformf("u_colorBase", fondoR, fondoG, fondoB);
@@ -395,7 +428,6 @@ public class GameScreen implements Screen {
         ScissorStack.calculateScissors(camera, viewport.getScreenX(), viewport.getScreenY(), viewport.getScreenWidth(), viewport.getScreenHeight(), juego.batch.getTransformMatrix(), boundsTablero, scissors);
         ScissorStack.pushScissors(scissors);
 
-        // TABLERO
         float scale = WORLD_WIDTH / texturaTablero.getWidth();
         float scaledHeight = texturaTablero.getHeight() * scale;
         float scrollOffset = scrollY % scaledHeight;
@@ -408,14 +440,12 @@ public class GameScreen implements Screen {
             drawY += scaledHeight;
         }
 
-        // SOMBRAS
         int filaEnBase = (int) (scrollY / CELL_H);
         Texture sombraActual = (filaEnBase % 2 == 0) ? SombraA : SombraB;
         float scaleSombra = WORLD_WIDTH / sombraActual.getWidth();
         float altoSombraEscalada = sombraActual.getHeight() * scaleSombra;
         juego.batch.draw(sombraActual, 0, offsetYTablero, WORLD_WIDTH, altoSombraEscalada);
 
-        // ENEMIGOS
         for (Enemigo e : gestorEnemigos.activos) {
             float px = e.colLogica * CELL_W;
             float py = (e.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H) + offsetYTablero;
@@ -428,7 +458,6 @@ public class GameScreen implements Screen {
             }
         }
 
-        // POWER-UPS
         for (PowerUp p : gestorEnemigos.powerUpsActivos) {
             float px = p.colLogica * CELL_W;
             float py = (p.filLogica * CELL_H) - scrollY + (JUGADOR_FILA_VIS * CELL_H) + offsetYTablero;
@@ -446,7 +475,6 @@ public class GameScreen implements Screen {
             }
         }
 
-        // JUGADOR
         TextureRegion regionDibujo = (movimientosCambio > 0 && piezaTransformada != null)
             ? regionesJugador.get(piezaTransformada)
             : piezaRey;
@@ -456,55 +484,20 @@ public class GameScreen implements Screen {
 
         juego.batch.draw(regionDibujo, pxJugador, pyJugador, CELL_W, CELL_H);
 
-        // AURA DE ESCUDO
         if (tieneEscudo) {
             juego.batch.setColor(0, 0, 1, 0.4f);
             juego.batch.draw(texturaPixelBlanco, jugadorCol * CELL_W, (JUGADOR_FILA_VIS * CELL_H) + offsetYTablero, CELL_W, CELL_H);
             juego.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
         }
 
-        // --- FIN DE RECORTE (SCISSOR) ---
         juego.batch.flush();
         ScissorStack.popScissors();
 
-        // TEXTOS DE INTERFAZ
-        if (estadoActual == EstadoJuego.JUGANDO) {
-            if (modoActual == ModoJuego.TUTORIAL) {
-                font.draw(juego.batch, "Tutorial " + nivelActual + " - Meta: " + filaMeta, 20, viewport.getWorldHeight() - 20);
-            } else {
-                font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), 20, viewport.getWorldHeight() - 20);
-
-                if (modoActual == ModoJuego.CONTRARRELOJ) {
-                    font.draw(juego.batch, "Tiempo: " + (int) tiempoRestante + "s", 20, viewport.getWorldHeight() - 60);
-                }
-            }
-        } else if (estadoActual == EstadoJuego.GAME_OVER) {
-            font.getData().setScale(3f);
-            font.draw(juego.batch, "GAME OVER", viewport.getWorldWidth() / 2f - 110, viewport.getWorldHeight() / 2f + 80);
-            font.getData().setScale(1.5f);
-            font.draw(juego.batch, mensajeGameOver, viewport.getWorldWidth() / 2f - 90, viewport.getWorldHeight() / 2f + 30);
-            font.getData().setScale(2f);
-            font.draw(juego.batch, "Puntos: " + (filaMaximaAlcanzada * 10), viewport.getWorldWidth() / 2f - 70, viewport.getWorldHeight() / 2f - 20);
-            font.getData().setScale(1.2f);
-            font.draw(juego.batch, "Toca para reiniciar", viewport.getWorldWidth() / 2f - 90, viewport.getWorldHeight() / 2f - 70);
-            font.getData().setScale(2f);
-        } else if (estadoActual == EstadoJuego.VICTORIA) {
-            font.getData().setScale(3f);
-            font.draw(juego.batch, "¡VICTORIA!", viewport.getWorldWidth() / 2f - 110, viewport.getWorldHeight() / 2f + 50);
-            font.getData().setScale(1.5f);
-            font.draw(juego.batch, "Tutorial completado", viewport.getWorldWidth() / 2f - 100, viewport.getWorldHeight() / 2f - 10);
-            font.getData().setScale(1.2f);
-            font.draw(juego.batch, "Toca para continuar", viewport.getWorldWidth() / 2f - 90, viewport.getWorldHeight() / 2f - 60);
-            font.getData().setScale(2f);
-        }
-
         juego.batch.end();
 
-        // --- 4. DIBUJADO DE LAS INTERFACES DE UI ---
         uiStage.act(delta);
         uiStage.draw();
 
-        // 5. SISTEMA DE GENERACIÓN CONTINUA E INFINITA
         int filaSuperiorPantalla = (int) ((scrollY + viewport.getWorldHeight()) / CELL_H);
         int filaObjetivo = Math.max(filaLogicaJugador + 8, filaSuperiorPantalla + 2);
 
@@ -515,6 +508,44 @@ public class GameScreen implements Screen {
             gestorEnemigos.generarFilaDeEnemigos(ultimaFilaGenerada, jugadorCol, filaLogicaJugador, modoActual, nivelActual, piezaActual);
             gestorEnemigos.intentarGenerarPowerUp(ultimaFilaGenerada);
         }
+    }
+
+    private void actualizarHUD() {
+        if (modoActual == ModoJuego.TUTORIAL) {
+            lblTutorial.setText("Tutorial " + nivelActual + " - Meta: " + filaMeta);
+            lblTutorial.setVisible(true);
+            lblPuntos.setVisible(false);
+            lblTiempo.setVisible(false);
+        } else {
+            lblTutorial.setVisible(false);
+            lblPuntos.setVisible(true);
+            lblPuntos.setText("Puntos: " + (filaMaximaAlcanzada * 10));
+
+            if (modoActual == ModoJuego.CONTRARRELOJ) {
+                lblTiempo.setVisible(true);
+                lblTiempo.setText("Tiempo: " + (int) tiempoRestante + "s");
+            } else {
+                lblTiempo.setVisible(false);
+            }
+        }
+    }
+
+    private void mostrarOverlay(String titulo, String sub, String puntos, String accion) {
+        overlayTable.setVisible(true);
+        lblOverlayTitulo.setText(titulo);
+        lblOverlaySub.setText(sub);
+        lblOverlayPuntos.setText(puntos);
+        lblOverlayAccion.setText(accion);
+
+        overlayTable.getColor().a = 0f;
+        overlayTable.addAction(Actions.sequence(
+            Actions.fadeIn(0.4f, Interpolation.sineOut)
+        ));
+    }
+
+    private void ocultarOverlay() {
+        overlayTable.setVisible(false);
+        overlayTable.clearActions();
     }
 
     private void handleInput() {
@@ -658,6 +689,7 @@ public class GameScreen implements Screen {
 
         gestorEnemigos.vaciar();
         estadoActual = EstadoJuego.JUGANDO;
+        ocultarOverlay();
     }
 
     private void activarPowerUp(TipoPowerUp tipo) {
@@ -762,7 +794,6 @@ public class GameScreen implements Screen {
     }
 
     private void dispararGameOver(String razon) {
-        System.out.println(razon + " Game Over.");
         mensajeGameOver = razon;
         estadoActual = EstadoJuego.GAME_OVER;
 
@@ -775,15 +806,15 @@ public class GameScreen implements Screen {
         }
 
         if (juego.db != null) {
-            com.brk.chessrunner.database.UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
+            UsuarioLocal jugadorActual = juego.db.obtenerUsuarioActual();
 
             if (jugadorActual != null) {
-                String idPartida = java.util.UUID.randomUUID().toString();
+                String idPartida = UUID.randomUUID().toString();
                 int puntuacion = filaMaximaAlcanzada * 10;
                 int tiempoSobrevivido = (modoActual == ModoJuego.CONTRARRELOJ) ? (int)(60f - tiempoRestante) : (int) tiempoJugado;
                 String fechaIso = java.time.LocalDateTime.now().toString();
 
-                com.brk.chessrunner.database.PartidaLocal nuevaPartida = new com.brk.chessrunner.database.PartidaLocal(
+                PartidaLocal nuevaPartida = new PartidaLocal(
                     idPartida, jugadorActual.getId(), puntuacion, filaMaximaAlcanzada,
                     piezaAsesina, tiempoSobrevivido, fechaIso, false
                 );
@@ -793,6 +824,13 @@ public class GameScreen implements Screen {
             } else {
                 System.err.println("No se pudo guardar: No hay usuario activo.");
             }
+        }
+
+        mostrarOverlay("GAME OVER", razon, "Puntos: " + (filaMaximaAlcanzada * 10), "Toca para reiniciar");
+
+        if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) {
+            estadoActual = EstadoJuego.VICTORIA;
+            mostrarOverlay("¡VICTORIA!", "Tutorial completado", "", "Toca para continuar");
         }
     }
 
@@ -824,7 +862,7 @@ public class GameScreen implements Screen {
         piezaRey = matrizJugador[0][0];
     }
 
-    public void alternarColorEnemigo() { // Sigue sin uso hasta crear la configuracion - igual que los tableros
+    public void alternarColorEnemigo() {
         configColorEnemigo = (configColorEnemigo == 1) ? 2 : 1;
         asignarSetDePiezas(configColorEnemigo);
     }
@@ -854,9 +892,7 @@ public class GameScreen implements Screen {
         if (texturaPixelBlanco != null) texturaPixelBlanco.dispose();
         if (texturaBlanca != null) texturaBlanca.dispose();
         if (shaderFondo != null) shaderFondo.dispose();
-
         if (uiStage != null) uiStage.dispose();
         if (uiSkin != null) uiSkin.dispose();
-        font.dispose();
     }
 }

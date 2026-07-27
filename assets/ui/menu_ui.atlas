@@ -1,4 +1,23 @@
 menu_ui-0.png
+size: 2040, 2015
+format: RGBA8888
+filter: Linear, Linear
+repeat: none
+pma: false
+icono_clasico
+  bounds: 1033, 1, 1006, 994
+  offsets: 450, 45, 1920, 1080
+icono_contrarreloj
+  bounds: 1033, 997, 1005, 995
+  offsets: 457, 44, 1920, 1080
+icono_supervivencia
+  bounds: 1, 1, 1030, 1018
+  offsets: 441, 31, 1920, 1080
+icono_tutorial
+  bounds: 1, 1021, 1004, 993
+  offsets: 456, 45, 1920, 1080
+
+menu_ui-1.png
 size: 946, 1270
 format: RGBA8888
 filter: Linear, Linear

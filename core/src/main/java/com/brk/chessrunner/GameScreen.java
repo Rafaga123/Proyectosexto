@@ -93,6 +93,7 @@ public class GameScreen implements Screen {
     public TipoPieza piezaTransformada;
     public int movimientosIA = 0;
     public float temporizadorIA = 0f;
+    public int ultimaColIA = -1;
     public int ultimaFilaGenerada = 5;
     public float tiempoReloj = 0f;
     private Texture texturaPixelBlanco;
@@ -153,64 +154,66 @@ public class GameScreen implements Screen {
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
 
         com.badlogic.gdx.Preferences prefs = Gdx.app.getPreferences("ChessRunnerSettings");
+
         int estiloTablero = prefs.getInteger("estiloTablero", 1);
         String rutaTablero = "tablero.png";
+        String rutaSombraA = "sombra_a.png";
+        String rutaSombraB = "sombra_b.png";
 
         switch (estiloTablero) {
-            case 1:
+            case 1: // Clásico
                 fondoR = 0.5f; fondoG = 0.85f; fondoB = 0.7f;
                 rutaTablero = "tablero.png";
+                rutaSombraA = "sombra_a.png";
+                rutaSombraB = "sombra_b.png";
                 break;
-            case 2:
-                fondoR = 0.75f; fondoG = 0.45f; fondoB = 0.25f;
-                rutaTablero = "tablero_madera.png";
+            case 2: // Azul
+                fondoR = 0.15f; fondoG = 0.35f; fondoB = 0.75f;
+                rutaTablero = "tablero azul.png";
+                rutaSombraA = "sombras a azul.png";
+                rutaSombraB = "sombras b azul.png";
                 break;
-            case 3:
-                fondoR = 0.8f; fondoG = 0.2f; fondoB = 0.8f;
-                rutaTablero = "tablero_neon.png";
+            case 3: // Oscuro
+                fondoR = 0.15f; fondoG = 0.15f; fondoB = 0.25f;
+                rutaTablero = "tablero oscuro.png";
+                rutaSombraA = "sombras a oscuro.png";
+                rutaSombraB = "sombras b oscuro.png";
                 break;
-            case 4:
-                fondoR = 0.2f; fondoG = 0.5f; fondoB = 0.9f;
-                rutaTablero = "tablero_oceano.png";
+            case 4: // Verde
+                fondoR = 0.2f; fondoG = 0.6f; fondoB = 0.3f;
+                rutaTablero = "tablero verde.png";
+                rutaSombraA = "sombras a verde.png";
+                rutaSombraB = "sombras b verde.png";
                 break;
-            case 5:
-                fondoR = 0.8f; fondoG = 0.1f; fondoB = 0.1f;
-                rutaTablero = "tablero_volcan.png";
-                break;
-            case 6:
-                fondoR = 0.9f; fondoG = 0.7f; fondoB = 0.1f;
-                rutaTablero = "tablero_desierto.png";
-                break;
-            case 7:
-                fondoR = 0.3f; fondoG = 0.9f; fondoB = 0.2f;
-                rutaTablero = "tablero_toxico.png";
-                break;
-            case 8:
-                fondoR = 0.6f; fondoG = 0.9f; fondoB = 0.9f;
-                rutaTablero = "tablero_hielo.png";
+            case 5: // Normal HD
+                fondoR = 0.4f; fondoG = 0.7f; fondoB = 0.6f;
+                rutaTablero = "tableros normal.png";
+                rutaSombraA = "sombras a normal.png";
+                rutaSombraB = "sombras b normal.png";
                 break;
             default:
-                fondoR = 0.5f; fondoG = 0.85f; fondoB = 0.7f;
-                rutaTablero = "tablero.png";
+                fondoR = 0.4f; fondoG = 0.7f; fondoB = 0.6f;
+                rutaTablero = "tableros normal.png";
+                rutaSombraA = "sombras a normal.png";
+                rutaSombraB = "sombras b normal.png";
                 break;
         }
 
-        if (!Gdx.files.internal(rutaTablero).exists()) {
-            rutaTablero = "tablero.png";
-        }
-
+        // --- 3. CARGA DE LAS TEXTURAS ---
         texturaTablero = new Texture(Gdx.files.internal(rutaTablero));
         texturaTablero.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
 
-        SombraA = new Texture(Gdx.files.internal("sombra_a.png"));
-        SombraB = new Texture(Gdx.files.internal("sombra_b.png"));
+        SombraA = new Texture(Gdx.files.internal(rutaSombraA));
+        SombraB = new Texture(Gdx.files.internal(rutaSombraB));
 
         texturaPiezasNegras = new Texture(Gdx.files.internal("piezas_negras.png"));
         texturaPiezasBlancas = new Texture(Gdx.files.internal("piezas_blancas.png"));
         regionesEnemigos = new ObjectMap<>();
 
-        String colorElegido = prefs.getString("estiloPiezas", "blancas");
-        configColorEnemigo = colorElegido.equals("negras") ? 2 : 1;
+        // Si el usuario eligió piezas negras, el enemigo debe ser blanco (1) y viceversa.
+        // En asignarSetDePiezas: 1 = Enemigo Negro/Jugador Blanco, 2 = Enemigo Blanco/Jugador Negro
+        String estiloPiezas = prefs.getString("estiloPiezas", "blancas");
+        configColorEnemigo = estiloPiezas.equals("negras") ? 2 : 1;
         asignarSetDePiezas(configColorEnemigo);
 
         gestorEnemigos = new GestorEnemigos();
@@ -428,8 +431,7 @@ public class GameScreen implements Screen {
         ScissorStack.calculateScissors(camera, viewport.getScreenX(), viewport.getScreenY(), viewport.getScreenWidth(), viewport.getScreenHeight(), juego.batch.getTransformMatrix(), boundsTablero, scissors);
         ScissorStack.pushScissors(scissors);
 
-        float scale = WORLD_WIDTH / texturaTablero.getWidth();
-        float scaledHeight = texturaTablero.getHeight() * scale;
+        float scaledHeight = CELL_H * 2f;
         float scrollOffset = scrollY % scaledHeight;
 
         float drawY = offsetYTablero - scrollOffset;
@@ -633,7 +635,10 @@ public class GameScreen implements Screen {
                     }
 
                     gestorEnemigos.limpiarObjetosPasados((int) (scrollY / CELL_H));
-                    if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) estadoActual = EstadoJuego.VICTORIA;
+                    if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) {
+                        estadoActual = EstadoJuego.VICTORIA;
+                        mostrarOverlay("¡VICTORIA!", "Tutorial completado", "", "Toca para continuar");
+                    }
                 }
             }
         }
@@ -681,6 +686,7 @@ public class GameScreen implements Screen {
         temporizadorIA = 0f;
         tiempoReloj = 0f;
         isDragging = false;
+        ultimaColIA = -1;
         ultimaFilaGenerada = 5;
 
         if (modoActual == ModoJuego.CONTRARRELOJ) {
@@ -741,39 +747,67 @@ public class GameScreen implements Screen {
         int mejorFila = filaLogicaJugador;
         boolean movio = false;
 
-        int nuevaFila = filaLogicaJugador + 1;
-        int[] columnasPosibles = {jugadorCol, jugadorCol - 1, jugadorCol + 1, jugadorCol - 2, jugadorCol + 2};
+        int[][] movimientosPrioridad = {
+            {0, 1},   // Frente
+            {1, 1},   // Diagonal derecha
+            {-1, 1},  // Diagonal izquierda
+            {1, 0},   // Lado derecho
+            {-1, 0},  // Lado izquierdo
+            {0, -1},  // Atrás recto
+            {1, -1},  // Atrás derecha
+            {-1, -1}  // Atrás izquierda
+        };
 
-        for (int col : columnasPosibles) {
-            if (col >= 0 && col < COLS) {
-                if (!gestorEnemigos.estaCasillaAmenazada(col, nuevaFila) && !gestorEnemigos.estaCasillaDefendida(col, nuevaFila)) {
-                    mejorCol = col;
-                    mejorFila = nuevaFila;
+        for (int[] mov : movimientosPrioridad) {
+            int targetCol = jugadorCol + mov[0];
+            int targetFila = filaLogicaJugador + mov[1];
+
+            // Verificamos que no se salga del tablero ni retroceda más de 1 fila de la máxima
+            int limiteInferior = Math.max(0, filaMaximaAlcanzada - 1);
+            if (targetCol >= 0 && targetCol < COLS && targetFila >= limiteInferior) {
+
+                boolean casillaSegura = false;
+
+                // Si la casilla tiene enemigo, comprobamos si ese enemigo está protegido
+                if (gestorEnemigos.hayEnemigoEnCasilla(targetCol, targetFila)) {
+                    casillaSegura = !gestorEnemigos.estaCasillaDefendida(targetCol, targetFila);
+                } else {
+                    // Si está vacía, comprobamos que ningún enemigo apunte ahí
+                    casillaSegura = !gestorEnemigos.estaCasillaAmenazada(targetCol, targetFila);
+                }
+
+                // Evitar el  moverse de lado a lado infinitamente
+                boolean esBucleHorizontal = (mov[1] == 0) && (targetCol == ultimaColIA);
+
+                if (casillaSegura && !esBucleHorizontal) {
+                    mejorCol = targetCol;
+                    mejorFila = targetFila;
                     movio = true;
                     break;
                 }
             }
         }
 
+        // Si la IA está acorralada 100% y no encontró salidas seguras fuerza un avance de frente (para sacrificarse o gastar el Escudo si lo tiene)
         if (!movio) {
-            for (int col : columnasPosibles) {
-                if (col >= 0 && col < COLS && col != jugadorCol) {
-                    if (!gestorEnemigos.estaCasillaAmenazada(col, filaLogicaJugador) && !gestorEnemigos.estaCasillaDefendida(col, filaLogicaJugador)) {
-                        mejorCol = col;
-                        mejorFila = filaLogicaJugador;
-                        movio = true;
-                        break;
-                    }
-                }
-            }
+            mejorFila = filaLogicaJugador + 1;
         }
 
-        if (!movio) mejorFila = filaLogicaJugador + 1;
+        // Registramos en la memoria si el movimiento fue puramente horizontal
+        if (mejorFila == filaLogicaJugador) {
+            ultimaColIA = jugadorCol;
+        } else {
+            ultimaColIA = -1; // Al avanzar o retroceder limpiamos la memoria
+        }
 
+        // Aplicamos el movimiento
         jugadorCol = mejorCol;
         filaLogicaJugador = mejorFila;
 
-        if (filaLogicaJugador > filaMaximaAlcanzada) filaMaximaAlcanzada = filaLogicaJugador;
+        if (filaLogicaJugador > filaMaximaAlcanzada) {
+            filaMaximaAlcanzada = filaLogicaJugador;
+        }
+
         targetScrollY = filaMaximaAlcanzada * CELL_H;
 
         gestorEnemigos.intentarCapturar(jugadorCol, filaLogicaJugador);
@@ -785,12 +819,15 @@ public class GameScreen implements Screen {
                 tiempoEscudo = 0f;
             } else {
                 dispararGameOver("¡JAQUE MATE!");
-                movimientosIA = 0;
+                movimientosIA = 0; // Abortar IA
             }
         }
 
         gestorEnemigos.limpiarObjetosPasados((int) (scrollY / CELL_H));
-        if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) estadoActual = EstadoJuego.VICTORIA;
+        if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) {
+            estadoActual = EstadoJuego.VICTORIA;
+            mostrarOverlay("¡VICTORIA!", "Tutorial completado", "", "Toca para continuar");
+        }
     }
 
     private void dispararGameOver(String razon) {
@@ -827,11 +864,6 @@ public class GameScreen implements Screen {
         }
 
         mostrarOverlay("GAME OVER", razon, "Puntos: " + (filaMaximaAlcanzada * 10), "Toca para reiniciar");
-
-        if (modoActual == ModoJuego.TUTORIAL && filaLogicaJugador >= filaMeta) {
-            estadoActual = EstadoJuego.VICTORIA;
-            mostrarOverlay("¡VICTORIA!", "Tutorial completado", "", "Toca para continuar");
-        }
     }
 
     public void asignarSetDePiezas(int color) {

@@ -14,7 +14,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 public class PersonalizacionDialog extends Dialog {
 
     private final com.badlogic.gdx.Preferences prefs;
-    private final TextButton[] botonesTablero = new TextButton[8];
+    private final TextButton[] botonesTablero = new TextButton[5];
+    private final String[] nombresTableros = {"Clasico", "Azul", "Oscuro", "Verde", "Normal HD"};
     private TextButton btnNegra;
     private TextButton btnBlanca;
 
@@ -34,9 +35,9 @@ public class PersonalizacionDialog extends Dialog {
 
         int tableroActual = prefs.getInteger("estiloTablero", 1);
 
-        for(int i = 1; i <= 8; i++) {
+        for(int i = 1; i <= 5; i++) {
             final int indexTablero = i;
-            String texto = (i == tableroActual) ? "Tablero\n" + i : "Tablero\n" + i;
+            String texto = nombresTableros[i - 1];
             TextButton btnTab = new TextButton(texto, skin);
             if (i == tableroActual) {
                 btnTab.setColor(Color.GOLD);
@@ -49,7 +50,7 @@ public class PersonalizacionDialog extends Dialog {
                     prefs.putInteger("estiloTablero", indexTablero);
                     prefs.flush();
                     actualizarSeleccionTableros(indexTablero);
-                    System.out.println("Guardado: Tablero " + indexTablero);
+                    System.out.println("Guardado: Tablero " + nombresTableros[indexTablero - 1]);
                 }
             });
 
@@ -71,10 +72,8 @@ public class PersonalizacionDialog extends Dialog {
 
         String colorActual = prefs.getString("estiloPiezas", "blancas");
         if (colorActual.equals("negras")) {
-            btnNegra.setText("Ficha\nNegra");
             btnNegra.setColor(Color.GOLD);
         } else {
-            btnBlanca.setText("Ficha\nBlanca");
             btnBlanca.setColor(Color.GOLD);
         }
 
@@ -84,7 +83,6 @@ public class PersonalizacionDialog extends Dialog {
                 prefs.putString("estiloPiezas", "negras");
                 prefs.flush();
                 actualizarSeleccionColor("negras");
-                System.out.println("Guardado: Fichas Negras");
             }
         });
 
@@ -94,7 +92,6 @@ public class PersonalizacionDialog extends Dialog {
                 prefs.putString("estiloPiezas", "blancas");
                 prefs.flush();
                 actualizarSeleccionColor("blancas");
-                System.out.println("Guardado: Fichas Blancas");
             }
         });
 
@@ -117,11 +114,10 @@ public class PersonalizacionDialog extends Dialog {
     private void actualizarSeleccionTableros(int seleccionado) {
         for (int i = 0; i < botonesTablero.length; i++) {
             int numTablero = i + 1;
+            botonesTablero[i].setText(nombresTableros[i]);
             if (numTablero == seleccionado) {
-                botonesTablero[i].setText("Tablero\n" + numTablero);
                 botonesTablero[i].setColor(Color.GOLD);
             } else {
-                botonesTablero[i].setText("Tablero\n" + numTablero);
                 botonesTablero[i].setColor(Color.WHITE);
             }
         }
@@ -129,9 +125,7 @@ public class PersonalizacionDialog extends Dialog {
 
     private void actualizarSeleccionColor(String seleccionado) {
         boolean negras = seleccionado.equals("negras");
-        btnNegra.setText(negras ? "Ficha\nNegra" : "Ficha\nNegra");
         btnNegra.setColor(negras ? Color.GOLD : Color.WHITE);
-        btnBlanca.setText(negras ? "Ficha\nBlanca" : "Ficha\nBlanca");
         btnBlanca.setColor(negras ? Color.WHITE : Color.GOLD);
     }
 }

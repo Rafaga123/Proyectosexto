@@ -16,65 +16,76 @@ import com.brk.chessrunner.ui.MainMenuScreen;
 
 public class PauseWidget extends Table {
 
-   private final MainGame game;
-   private final Skin skin;
-   private final Stage stage;
-   private final IPauseListener listener;
+    private final MainGame game;
+    private final Skin skin;
+    private final Stage stage;
+    private final IPauseListener listener;
 
-   public interface IPauseListener{
-       void onResume();
-   }
+    public interface IPauseListener{
+        void onResume();
+    }
 
-   public PauseWidget(final MainGame game, final Skin skin, final Stage stage, final IPauseListener listener){
+    public PauseWidget(final MainGame game, final Skin skin, final Stage stage, final IPauseListener listener){
 
-       this.game= game;
-       this.skin= skin;
-       this.stage = stage;
-       this.listener= listener;
+        this.game= game;
+        this.skin= skin;
+        this.stage = stage;
+        this.listener= listener;
 
-       setFillParent(true);
+        setFillParent(true);
 
-       Image bg = new Image(skin, "overlay");
-       bg.setFillParent(true);
-       addActor(bg);
+        Image bg = new Image(skin, "overlay");
+        bg.setFillParent(true);
+        addActor(bg);
 
-       Label pauseLabel= new Label("JUEGO EN PAUSA", skin, "titulo");
+        Label pauseLabel= new Label("JUEGO EN PAUSA", skin, "titulo");
 
-       TextButton btnReanudar= new TextButton("REANUDAR",skin);
-       TextButton btnConfig= new TextButton("CONFIGURACION",skin);
-       TextButton btnSalir= new TextButton("SALIR",skin);
+        TextButton btnReanudar= new TextButton("REANUDAR",skin);
+        TextButton btnConfig= new TextButton("CONFIGURACION",skin);
+        TextButton btnSalir= new TextButton("SALIR",skin);
 
-       btnReanudar.addListener(new ClickListener(){
-           @Override
-           public void clicked(InputEvent event, float x, float y){
-               listener.onResume();
-           }
-       });
+        btnReanudar.addListener(new ClickListener(){
+            @Override
+            public void clicked(InputEvent event, float x, float y){
+                listener.onResume();
+            }
+        });
 
         btnConfig.addListener(new ClickListener(){
-           @Override
-           public void clicked(InputEvent event, float x, float y){
-               PauseWidget.this.remove();
-               ConfigGame settingsDialog = new ConfigGame("Configuracion",skin);
-               settingsDialog.show(stage);
-           }
+            @Override
+            public void clicked(InputEvent event, float x, float y){
+
+                PauseWidget.this.setVisible(false);
+
+
+                ConfigGame settingsDialog = new ConfigGame("Configuracion", skin) {
+                    @Override
+                    public void hide() {
+                        super.hide(); // Ejecuta el cierre normal del menú de configuración
+                        // 3. Cuando se cierra la configuración, reaparecemos el menú de pausa
+                        PauseWidget.this.setVisible(true);
+                    }
+                };
+                settingsDialog.show(stage);
+            }
         });
 
         btnSalir.addListener(new ClickListener(){
-           public void clicked(InputEvent event, float x, float y ) {
-               PauseWidget.this.setVisible(false);
-               mostrarConfirmacionSalida();
-           }
+            @Override
+            public void clicked(InputEvent event, float x, float y ) {
+                PauseWidget.this.setVisible(false);
+                mostrarConfirmacionSalida();
+            }
         });
 
-       add(pauseLabel).padBottom(40f).row();
-       add(btnReanudar).size(220f,50f).padBottom(15f).row();
-       add(btnConfig).size(220f,50f).padBottom(15f).row();
-       add(btnSalir).size(220f,50f);
+        add(pauseLabel).padBottom(40f).row();
+        add(btnReanudar).size(220f,50f).padBottom(15f).row();
+        add(btnConfig).size(220f,50f).padBottom(15f).row();
+        add(btnSalir).size(220f,50f);
 
-       getColor().a = 0f;
-       addAction(Actions.fadeIn(0.25f, Interpolation.sineOut));
-   }
+        getColor().a = 0f;
+        addAction(Actions.fadeIn(0.25f, Interpolation.sineOut));
+    }
 
     private void mostrarConfirmacionSalida(){
         Dialog confirmarDialog = new Dialog("Alerta",skin){
@@ -84,7 +95,7 @@ public class PauseWidget extends Table {
                     com.badlogic.gdx.Screen pantallaActual= game.getScreen();
                     game.switchScreen(new MainMenuScreen(game, game.db));
                     if(pantallaActual!=null){
-                         pantallaActual.dispose();
+                        pantallaActual.dispose();
                     }
                 } else {
                     PauseWidget.this.setVisible(true);
@@ -106,5 +117,4 @@ public class PauseWidget extends Table {
         confirmarDialog.setMovable(false);
         confirmarDialog.show(stage);
     }
-
 }

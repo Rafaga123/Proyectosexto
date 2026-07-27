@@ -22,7 +22,15 @@ public class GestorEnemigos {
         for (int i = 0; i < activos.size; i++) {
             Enemigo e = activos.get(i);
 
+            // Si el jugador se mueve a la casilla del enemigo, ese enemigo no lo amenaza (es capturado)
+            if (e.colLogica == col && e.filLogica == fila) continue;
+
             if (Math.abs(e.filLogica - fila) > 7) continue;
+
+            // REGLA DE VISIBILIDAD: Si el enemigo está 2 filas por debajo (fila - 2),
+            // ya es invisible para el jugador y se vuelve inofensivo.
+            if (e.filLogica < fila - 1) continue;
+
             // El ataque solo es válido si la línea de visión está limpia
             if (e.atacaCasilla(col, fila) && !caminoBloqueado(e, col, fila)) {
                 return true;
@@ -31,13 +39,17 @@ public class GestorEnemigos {
         return false;
     }
 
-    // verifica si podemos capturar una pieza de forma segura
+    // Verifica si podemos capturar una pieza de forma segura
     public boolean estaCasillaDefendida(int col, int fila) {
         for (int i = 0; i < activos.size; i++) {
             Enemigo e = activos.get(i);
+            // Si el jugador se mueve a la casilla del enemigo, ese enemigo no defiende (es capturado)
             if (e.colLogica == col && e.filLogica == fila) continue;
 
             if (Math.abs(e.filLogica - fila) > 7) continue;
+
+            if (e.filLogica < fila - 1) continue; // Los enemigos invisibles no defienden
+
             if (e.atacaCasilla(col, fila) && !caminoBloqueado(e, col, fila)) {
                 return true;
             }
@@ -73,18 +85,18 @@ public class GestorEnemigos {
 
     // Limpieza de memoria para enemigos y power-ups
     public void limpiarObjetosPasados(int filaBasePantalla) {
-        // Iteramos el array de atrás hacia adelante para poder borrar elementos sin que se rompa el bucle
+        // Iteramos el array de atrás hacia adelante para evitar errores al borrar
         for (int i = activos.size - 1; i >= 0; i--) {
             Enemigo e = activos.get(i);
-            // Si el enemigo quedó 2 filas por debajo del borde de la pantalla, lo borramos de la RAM
-            if (e.filLogica < filaBasePantalla - 2) {
+
+            if (e.filLogica < filaBasePantalla - 1) {
                 activos.removeIndex(i);
             }
         }
 
         for (int i = powerUpsActivos.size - 1; i >= 0; i--) {
             PowerUp p = powerUpsActivos.get(i);
-            if (p.filLogica < filaBasePantalla - 2) {
+            if (p.filLogica < filaBasePantalla - 1) {
                 powerUpsActivos.removeIndex(i);
             }
         }
@@ -254,6 +266,12 @@ public class GestorEnemigos {
                 int tirada = MathUtils.random(1, 100);
                 if (tirada <= 50) return TipoPieza.PEON;
                 if (tirada <= 80) return TipoPieza.CABALLO;
+                return TipoPieza.ALFIL;
+            } else {
+                // Niveles superiores de tutorial: Mezcla completa
+                int tirada = MathUtils.random(1, 100);
+                if (tirada <= 40) return TipoPieza.PEON;
+                if (tirada <= 70) return TipoPieza.CABALLO;
                 return TipoPieza.ALFIL;
             }
         }

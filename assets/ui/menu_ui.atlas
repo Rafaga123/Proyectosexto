@@ -1,0 +1,21 @@
+menu_ui-0.png
+size: 946, 1270
+format: RGBA8888
+filter: Linear, Linear
+repeat: none
+pma: false
+Flecha_der_transparente
+  bounds: 1, 357, 471, 428
+  offsets: 20, 42, 512, 512
+Flecha_izq_transparente
+  bounds: 474, 357, 471, 428
+  offsets: 21, 42, 512, 512
+Img_Configuracion_transparente
+  bounds: 355, 787, 481, 482
+  offsets: 16, 13, 512, 512
+Img_Usuario_transparente
+  bounds: 1, 787, 352, 450
+  offsets: 80, 18, 512, 512
+Recuadro_Texto
+  bounds: 1, 1, 904, 354
+  offsets: 263, 175, 1320, 704

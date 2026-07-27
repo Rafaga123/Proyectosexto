@@ -120,14 +120,6 @@ Conecta tu dispositivo móvil con depuración USB o inicia un emulador y ejecuta
 
 ---
 
-## 🎯 Demostración de Juego / Capturas
-
-| Menú Principal | Selección de Modos | Gameplay | Personalización |
-| --- | --- | --- | --- |
-| *(Agrega tu captura)* | *(Agrega tu captura)* | *(Agrega tu captura)* | *(Agrega tu captura)* |
-
----
-
 ## 🤝 Contribución
 
 Las contribuciones son bienvenidas. Si deseas proponer una mejora o corregir un bug:
@@ -144,6 +136,3 @@ Las contribuciones son bienvenidas. Si deseas proponer una mejora o corregir un 
 
 Distribuido bajo la Licencia MIT. Consulta el archivo `LICENSE` para obtener más información.
 
-```
-
-```

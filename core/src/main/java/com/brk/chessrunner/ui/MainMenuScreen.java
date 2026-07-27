@@ -5,6 +5,7 @@ import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -15,8 +16,6 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Button;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
-import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
-import com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -37,6 +36,8 @@ public class MainMenuScreen implements Screen {
 
     private Stage stage;
     private SpriteBatch batch;
+
+    private Texture texturaFondo; // Textura estática para el fondo
 
     private TextureAtlas uiAtlas;
     private TextureRegion recuadroTexto;
@@ -77,12 +78,13 @@ public class MainMenuScreen implements Screen {
 
     private void inicializarModosJuego() {
         modosDisponibles = new Array<>();
-        modosDisponibles.add(new InfoModo("Clasico\n(Sin presión)", "default-rect", ModoJuego.CLASICO, 0));
-        modosDisponibles.add(new InfoModo("Supervivencia\n(Infinito)", "default-rect", ModoJuego.INFINITO, 0));
-        modosDisponibles.add(new InfoModo("Contrarreloj", "default-rect", ModoJuego.CONTRARRELOJ, 0));
-        modosDisponibles.add(new InfoModo("Tutorial: Nivel 1", "default-rect", ModoJuego.TUTORIAL, 1));
-        modosDisponibles.add(new InfoModo("Tutorial: Nivel 2", "default-rect", ModoJuego.TUTORIAL, 2));
-        modosDisponibles.add(new InfoModo("Tutorial: Nivel 3", "default-rect", ModoJuego.TUTORIAL, 3));
+        // Nombres referenciales para tu TextureAtlas
+        modosDisponibles.add(new InfoModo("Clasico", "icono_clasico", ModoJuego.CLASICO, 0));
+        modosDisponibles.add(new InfoModo("Supervivencia", "icono_supervivencia", ModoJuego.INFINITO, 0));
+        modosDisponibles.add(new InfoModo("Contrarreloj", "icono_contrarreloj", ModoJuego.CONTRARRELOJ, 0));
+        modosDisponibles.add(new InfoModo("Tutorial: Nivel 1", "icono_tutorial", ModoJuego.TUTORIAL, 1));
+        modosDisponibles.add(new InfoModo("Tutorial: Nivel 2", "icono_tutorial", ModoJuego.TUTORIAL, 2));
+        modosDisponibles.add(new InfoModo("Tutorial: Nivel 3", "icono_tutorial", ModoJuego.TUTORIAL, 3));
     }
 
     @Override
@@ -90,7 +92,13 @@ public class MainMenuScreen implements Screen {
         stage = new Stage(new FitViewport(480, 800));
         Gdx.input.setInputProcessor(stage);
 
-        // --- 1. CARGAR EL ATLAS Y LOS DRAWABLES ---
+        // --- CARGAR IMAGEN DE FONDO ESTATICA ---
+        texturaFondo = new Texture(Gdx.files.internal("Fondo_menu_main.jpeg"));
+        Image imgFondo = new Image(texturaFondo);
+        imgFondo.setFillParent(true);
+        stage.addActor(imgFondo); // Lo añadimos primero para que sea el fondo
+
+        // --- CARGAR EL ATLAS Y LOS DRAWABLES ---
         uiAtlas = new TextureAtlas(Gdx.files.internal("ui/menu_ui.atlas"));
 
         TextureRegionDrawable drawRecuadro = new TextureRegionDrawable(uiAtlas.findRegion("Recuadro_Texto"));
@@ -128,18 +136,19 @@ public class MainMenuScreen implements Screen {
         configStyle.down = drawConfig;
         Button btnConfiguracion = new Button(configStyle);
 
-
         Button btnUsuario = new Button(new Button.ButtonStyle());
-        btnUsuario.add(new Image(drawUser)).size(40, 40).center().row();
+        // Reducimos la imagen del usuario a 30x30 (antes 40x40)
+        btnUsuario.add(new Image(drawUser)).size(30, 30).center().row();
         btnUsuario.add(new Label(aliasMostrar, skin, "normal")).padTop(5).center();
 
         Label lblTituloJuego = new Label("KING DASH", skin, "titulo");
 
-        topTable.add(btnConfiguracion).left().pad(15).size(60, 60);
+        // Reducimos la celda del engranaje a 40x40 (antes 60x60)
+        topTable.add(btnConfiguracion).left().pad(15).size(40, 40);
         topTable.add(lblTituloJuego).expandX().center();
-        topTable.add(btnUsuario).right().pad(15).height(60);
+        // Le quitamos el height fijo a la celda del usuario para que se adapte a su contenido
+        topTable.add(btnUsuario).right().pad(15);
 
-        Table carouselTable = new Table();
 
         // --- BOTONES DEL CARRUSEL ---
         Button.ButtonStyle flechaIzqStyle = new Button.ButtonStyle();
@@ -152,11 +161,18 @@ public class MainMenuScreen implements Screen {
         flechaDerStyle.down = drawFlechaDer;
         Button btnFlechaDer = new Button(flechaDerStyle);
 
-        imgPiezaAjedrez = new Image(skin, "default-rect");
+        // 1. Instanciamos la imagen vacía
+        imgPiezaAjedrez = new Image();
 
-        carouselTable.add(btnFlechaIzq).left().pad(20).size(60, 60);
-        carouselTable.add(imgPiezaAjedrez).expandX().center().size(180, 280);
-        carouselTable.add(btnFlechaDer).right().pad(20).size(60, 60);
+        // 2. CRUCIAL: Forzamos el escalado para que la textura nunca rompa la celda
+        imgPiezaAjedrez.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+
+        Table carouselTable = new Table();
+
+        // 3. Construimos la tabla (SOLO UNA VEZ)
+        carouselTable.add(btnFlechaIzq).size(40, 40).padLeft(30).left();
+        carouselTable.add(imgPiezaAjedrez).expandX().center().size(300, 470);
+        carouselTable.add(btnFlechaDer).size(40, 40).padRight(30).right();
 
         // --- BOTÓN JUGAR ---
         TextButton.TextButtonStyle playBtnStyle = new TextButton.TextButtonStyle(skin.get(TextButton.TextButtonStyle.class));
@@ -171,6 +187,7 @@ public class MainMenuScreen implements Screen {
         mainTable.add(carouselTable).expand().fill().row();
         mainTable.add(botonJugar).padBottom(60).width(240).height(70).row();
 
+        // Se añade después del fondo para que la UI se renderice encima
         stage.addActor(mainTable);
 
         animarEntrada();
@@ -254,7 +271,15 @@ public class MainMenuScreen implements Screen {
 
     private void actualizarInterfazModo() {
         InfoModo modoActual = modosDisponibles.get(indiceModoActual);
-        imgPiezaAjedrez.setDrawable(skin.getDrawable(modoActual.regionTexturaPieza));
+
+        TextureRegion regionPieza = uiAtlas.findRegion(modoActual.regionTexturaPieza);
+
+        if (regionPieza != null) {
+            imgPiezaAjedrez.setDrawable(new TextureRegionDrawable(regionPieza));
+        } else {
+            imgPiezaAjedrez.setDrawable(skin.getDrawable("default-rect"));
+        }
+
         botonJugar.setText(modoActual.nombrePantalla);
     }
 
@@ -270,8 +295,7 @@ public class MainMenuScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        // Fondo negro por defecto o el color que prefieras
-        Gdx.gl.glClearColor(0.12f,0.15f , 0.18f, 1);
+        Gdx.gl.glClearColor(0.12f, 0.15f, 0.18f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         stage.act(delta);
@@ -296,5 +320,8 @@ public class MainMenuScreen implements Screen {
         if (skin != null) skin.dispose();
         if (uiAtlas != null) uiAtlas.dispose();
         if (batch != null) batch.dispose();
+
+        // Limpiamos la memoria de la textura de fondo
+        if (texturaFondo != null) texturaFondo.dispose();
     }
 }

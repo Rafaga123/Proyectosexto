@@ -6,6 +6,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import com.brk.chessrunner.database.EstadisticasUsuario;
 import com.brk.chessrunner.database.LocalDatabase;
 import com.brk.chessrunner.database.PartidaLocal;
 import com.brk.chessrunner.database.UsuarioLocal;
@@ -120,6 +121,43 @@ public class AndroidDatabaseManager implements LocalDatabase {
         ContentValues values = new ContentValues();
         values.put("sincronizado", 1);
         db.update("partida_local", values, "id = ?", new String[]{partidaId});
+    }
+
+    @Override
+    public EstadisticasUsuario obtenerEstadisticas(String usuarioId) {
+        Cursor cursor = db.rawQuery(
+            "SELECT COUNT(*) AS total, COALESCE(MAX(puntuacion), 0) AS mejor_puntuacion, " +
+            "COALESCE(SUM(tiempo_sobrevivido), 0) AS tiempo_total, " +
+            "COALESCE(MAX(nivel_alcanzado), 0) AS mejor_nivel " +
+            "FROM partida_local WHERE usuario_id = ?",
+            new String[]{usuarioId}
+        );
+        EstadisticasUsuario estadisticas = new EstadisticasUsuario(0, 0, 0, 0);
+        if (cursor.moveToFirst()) {
+            estadisticas = new EstadisticasUsuario(
+                cursor.getInt(cursor.getColumnIndexOrThrow("total")),
+                cursor.getInt(cursor.getColumnIndexOrThrow("mejor_puntuacion")),
+                cursor.getLong(cursor.getColumnIndexOrThrow("tiempo_total")),
+                cursor.getInt(cursor.getColumnIndexOrThrow("mejor_nivel"))
+            );
+        }
+        cursor.close();
+        return estadisticas;
+    }
+
+    @Override
+    public void cerrarSesion() {
+        UsuarioLocal usuario = obtenerUsuarioActual();
+        if (usuario == null) return;
+
+        db.delete("usuario_local", "id = ?", new String[]{usuario.getId()});
+
+        String idInvitado = "guest_" + UUID.randomUUID().toString().substring(0, 8);
+        ContentValues values = new ContentValues();
+        values.put("id", idInvitado);
+        values.put("alias", "Jugador");
+        values.put("sesion_activa", 1);
+        db.insert("usuario_local", null, values);
     }
 
     private static class DatabaseHelper extends SQLiteOpenHelper {

@@ -85,6 +85,50 @@ public class ApiClient {
     }
 
     /**
+     * Petición para registrar una nueva cuenta en Spring Boot
+     */
+    public static void registrar(String id, String alias, String correo, String password, ApiCallback callback) {
+        HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
+
+        String jsonBody = "{\"id\":\"" + id + "\", \"alias\":\"" + alias +
+            "\", \"correo\":\"" + correo + "\", \"password\":\"" + password + "\"}";
+
+        Net.HttpRequest httpRequest = requestBuilder.newRequest()
+            .method(Net.HttpMethods.POST)
+            .url(getBaseUrl() + "/usuarios")
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .content(jsonBody)
+            .build();
+
+        Gdx.net.sendHttpRequest(httpRequest, new Net.HttpResponseListener() {
+            @Override
+            public void handleHttpResponse(Net.HttpResponse httpResponse) {
+                int statusCode = httpResponse.getStatus().getStatusCode();
+                String resultAsString = httpResponse.getResultAsString();
+
+                if (statusCode >= 200 && statusCode < 300) {
+                    JsonReader jsonReader = new JsonReader();
+                    JsonValue json = jsonReader.parse(resultAsString);
+                    callback.onExito(json);
+                } else {
+                    callback.onError(traducirError(statusCode, resultAsString));
+                }
+            }
+
+            @Override
+            public void failed(Throwable t) {
+                callback.onError("Revise su conexión a internet");
+            }
+
+            @Override
+            public void cancelled() {
+                callback.onError("Conexión cancelada");
+            }
+        });
+    }
+
+    /**
      * Petición para enviar partidas locales a Spring Boot
      */
     public static void sincronizarPartidas(String usuarioId, java.util.List<com.brk.chessrunner.database.PartidaLocal> partidas, ApiCallback callback) {

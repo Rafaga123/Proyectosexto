@@ -10,4 +10,6 @@ public interface LocalDatabase {
     void vincularCuenta(UsuarioLocal usuarioApi);
     List<PartidaLocal> obtenerPartidasNoSincronizadas(String usuarioId);
     void marcarComoSincronizada(String partidaId);
+    EstadisticasUsuario obtenerEstadisticas(String usuarioId);
+    void cerrarSesion();
 }

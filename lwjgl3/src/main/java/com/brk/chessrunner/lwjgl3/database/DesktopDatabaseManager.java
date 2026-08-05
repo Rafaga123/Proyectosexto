@@ -1,5 +1,6 @@
 package com.brk.chessrunner.lwjgl3.database;
 
+import com.brk.chessrunner.database.EstadisticasUsuario;
 import com.brk.chessrunner.database.LocalDatabase;
 import com.brk.chessrunner.database.PartidaLocal;
 import com.brk.chessrunner.database.UsuarioLocal;
@@ -188,6 +189,53 @@ public class DesktopDatabaseManager implements LocalDatabase {
             pstmt.executeUpdate();
         } catch (java.sql.SQLException e) {
             System.err.println("Error al marcar partida como sincronizada: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public EstadisticasUsuario obtenerEstadisticas(String usuarioId) {
+        String sql = "SELECT COUNT(*) AS total, COALESCE(MAX(puntuacion), 0) AS mejor_puntuacion, " +
+            "COALESCE(SUM(tiempo_sobrevivido), 0) AS tiempo_total, " +
+            "COALESCE(MAX(nivel_alcanzado), 0) AS mejor_nivel " +
+            "FROM partida_local WHERE usuario_id = ?";
+
+        try (java.sql.PreparedStatement pstmt = conexion.prepareStatement(sql)) {
+            pstmt.setString(1, usuarioId);
+            try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new EstadisticasUsuario(
+                        rs.getInt("total"),
+                        rs.getInt("mejor_puntuacion"),
+                        rs.getLong("tiempo_total"),
+                        rs.getInt("mejor_nivel")
+                    );
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            System.err.println("Error al obtener estadísticas: " + e.getMessage());
+        }
+        return new EstadisticasUsuario(0, 0, 0, 0);
+    }
+
+    @Override
+    public void cerrarSesion() {
+        UsuarioLocal usuario = obtenerUsuarioActual();
+        if (usuario == null) return;
+
+        try (java.sql.PreparedStatement pstmt = conexion.prepareStatement("DELETE FROM usuario_local WHERE id = ?")) {
+            pstmt.setString(1, usuario.getId());
+            pstmt.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            System.err.println("Error al cerrar sesión: " + e.getMessage());
+        }
+
+        String idInvitado = "guest_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        String sqlInsert = "INSERT INTO usuario_local (id, alias, correo, sesion_activa) VALUES (?, 'Jugador', NULL, 1)";
+        try (java.sql.PreparedStatement pstmt = conexion.prepareStatement(sqlInsert)) {
+            pstmt.setString(1, idInvitado);
+            pstmt.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            System.err.println("Error al crear invitado tras cerrar sesión: " + e.getMessage());
         }
     }
 }

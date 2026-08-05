@@ -142,6 +142,8 @@ public class MainMenuScreen implements Screen {
         btnUsuario.add(new Label(aliasMostrar, skin, "normal")).padTop(5).center();
 
         Label lblTituloJuego = new Label("KING DASH", skin, "titulo");
+        lblTituloJuego.setFontScale(1.3f);
+        lblTituloJuego.setColor(Color.valueOf("#002AA6"));
 
         // Reducimos la celda del engranaje a 40x40 (antes 60x60)
         topTable.add(btnConfiguracion).left().pad(15).size(40, 40);
@@ -226,13 +228,8 @@ public class MainMenuScreen implements Screen {
         btnUsuario.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                if (usuario != null && usuario.getId().startsWith("guest")) {
-                    LoginDialog dialog = new LoginDialog("Iniciar Sesion", skin, db, game);
-                    dialog.show(stage);
-                } else {
-                    SyncDialog dialog = new SyncDialog("Sincronizando", skin, db);
-                    dialog.show(stage);
-                }
+                PerfilDialog dialog = new PerfilDialog("Perfil", skin, db, game);
+                dialog.show(stage);
             }
         });
 
